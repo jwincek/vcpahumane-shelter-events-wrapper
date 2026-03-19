@@ -1,0 +1,51 @@
+{
+	"taxonomies": {
+		"shelter_program": {
+			"post_types": [ "tribe_events" ],
+			"args": {
+				"labels": {
+					"name": "Programs",
+					"singular_name": "Program",
+					"menu_name": "Shelter Programs",
+					"add_new_item": "Add New Program",
+					"edit_item": "Edit Program",
+					"search_items": "Search Programs"
+				},
+				"public": true,
+				"hierarchical": true,
+				"show_in_rest": true,
+				"show_admin_column": true,
+				"rewrite": {
+					"slug": "shelter-program"
+				}
+			},
+			"default_terms": [
+				{
+					"name": "Fundraiser",
+					"slug": "fundraiser",
+					"description": "Fundraising events like BINGO, galas, and auctions."
+				},
+				{
+					"name": "Clinic",
+					"slug": "clinic",
+					"description": "Veterinary clinics including spay/neuter, vaccinations, and wellness."
+				},
+				{
+					"name": "Adoption",
+					"slug": "adoption",
+					"description": "Adoption events and meet-and-greets."
+				},
+				{
+					"name": "Education",
+					"slug": "education",
+					"description": "Community education, workshops, and training."
+				},
+				{
+					"name": "Volunteer",
+					"slug": "volunteer",
+					"description": "Volunteer orientation and workdays."
+				}
+			]
+		}
+	}
+}

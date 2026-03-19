@@ -1,0 +1,33 @@
+/**
+ * Shelter Events — Admin Styles
+ */
+
+.shelter-events-admin .shelter-card {
+	background: #fff;
+	border: 1px solid #ccd0d4;
+	border-radius: 4px;
+	padding: 1.5rem 2rem;
+	margin: 1.5rem 0;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.shelter-events-admin .shelter-card h2 {
+	margin-top: 0;
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid #eee;
+}
+
+.shelter-events-admin .shelter-results-list {
+	margin: 0.5rem 0;
+	padding-left: 1.5rem;
+}
+
+.shelter-events-admin .shelter-results-list li {
+	margin-bottom: 0.3rem;
+	font-family: monospace;
+	font-size: 13px;
+}
+
+.shelter-events-admin .form-table th {
+	width: 160px;
+}

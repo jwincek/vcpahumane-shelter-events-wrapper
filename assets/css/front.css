@@ -1,0 +1,201 @@
+/**
+ * Shelter Events — Front-end Styles
+ *
+ * Styles the shelter-event-list block in list, card, and compact layouts.
+ * Uses CSS custom properties so theme authors can override easily.
+ */
+
+:root {
+	--shelter-accent: #d35400;
+	--shelter-accent-light: #e67e22;
+	--shelter-text: #2c3e50;
+	--shelter-text-muted: #7f8c8d;
+	--shelter-bg: #ffffff;
+	--shelter-bg-alt: #f8f9fa;
+	--shelter-border: #ecf0f1;
+	--shelter-radius: 8px;
+	--shelter-cancelled-bg: #fdf2f2;
+	--shelter-cancelled-border: #e74c3c;
+	--shelter-gap: 1rem;
+}
+
+/* ── Base list layout ─────────────────────────────────────────────────── */
+
+.shelter-event-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--shelter-gap);
+}
+
+.shelter-event-item {
+	display: flex;
+	gap: 1.25rem;
+	padding: 1rem 1.25rem;
+	background: var(--shelter-bg);
+	border: 1px solid var(--shelter-border);
+	border-radius: var(--shelter-radius);
+	transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.shelter-event-item:hover {
+	border-color: var(--shelter-accent-light);
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.shelter-event-item--cancelled {
+	background: var(--shelter-cancelled-bg);
+	border-left: 4px solid var(--shelter-cancelled-border);
+	opacity: 0.75;
+}
+
+/* ── Date column ──────────────────────────────────────────────────────── */
+
+.shelter-event-item__date {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-width: 4rem;
+	padding: 0.5rem;
+	background: var(--shelter-bg-alt);
+	border-radius: var(--shelter-radius);
+	text-align: center;
+	flex-shrink: 0;
+}
+
+.shelter-event-item__day {
+	font-size: 0.75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--shelter-accent);
+}
+
+.shelter-event-item__month-day {
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--shelter-text);
+	line-height: 1.2;
+}
+
+/* ── Details column ───────────────────────────────────────────────────── */
+
+.shelter-event-item__details {
+	flex: 1;
+	min-width: 0;
+}
+
+.shelter-event-item__title {
+	margin: 0 0 0.35rem;
+	font-size: 1.05rem;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.shelter-event-item__title a {
+	color: var(--shelter-text);
+	text-decoration: none;
+}
+
+.shelter-event-item__title a:hover {
+	color: var(--shelter-accent);
+}
+
+.shelter-event-item__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1rem;
+	font-size: 0.85rem;
+	color: var(--shelter-text-muted);
+}
+
+.shelter-event-item__meta span::before {
+	margin-right: 0.3em;
+}
+
+.shelter-event-item__time::before {
+	content: "🕐";
+}
+
+.shelter-event-item__venue::before {
+	content: "📍";
+}
+
+.shelter-event-item__cost::before {
+	content: "💲";
+}
+
+.shelter-event-item__badge {
+	display: inline-block;
+	margin-top: 0.5rem;
+	padding: 0.15em 0.6em;
+	font-size: 0.75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	border-radius: 3px;
+}
+
+.shelter-event-item__badge--cancelled {
+	background: var(--shelter-cancelled-border);
+	color: #fff;
+}
+
+/* ── Card grid layout ─────────────────────────────────────────────────── */
+
+.shelter-event-list--card {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: var(--shelter-gap);
+}
+
+.shelter-event-list--card .shelter-event-item {
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.shelter-event-list--card .shelter-event-item__date {
+	flex-direction: row;
+	gap: 0.5rem;
+	min-width: unset;
+	width: 100%;
+	justify-content: flex-start;
+	padding: 0.6rem 0.75rem;
+}
+
+/* ── Compact layout ───────────────────────────────────────────────────── */
+
+.shelter-event-list--compact .shelter-event-item {
+	padding: 0.6rem 1rem;
+	gap: 0.75rem;
+	align-items: center;
+}
+
+.shelter-event-list--compact .shelter-event-item__date {
+	flex-direction: row;
+	gap: 0.4rem;
+	min-width: unset;
+	padding: 0.25rem 0.5rem;
+	font-size: 0.8rem;
+}
+
+.shelter-event-list--compact .shelter-event-item__title {
+	font-size: 0.95rem;
+	margin: 0;
+}
+
+.shelter-event-list--compact .shelter-event-item__meta {
+	font-size: 0.8rem;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+
+.shelter-events-empty,
+.shelter-events-error {
+	padding: 2rem;
+	text-align: center;
+	color: var(--shelter-text-muted);
+	font-style: italic;
+	background: var(--shelter-bg-alt);
+	border-radius: var(--shelter-radius);
+}

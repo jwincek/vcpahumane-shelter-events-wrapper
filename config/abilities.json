@@ -1,0 +1,66 @@
+{
+	"abilities": {
+		"shelter_generate_events": {
+			"label": "Generate Recurring Events",
+			"description": "Create upcoming event instances from the program schedule configuration.",
+			"category": "shelter-events",
+			"permission_callback": "manage_options",
+			"schema": {
+				"type": "object",
+				"properties": {
+					"program": {
+						"type": "string",
+						"description": "Program slug to generate events for. Omit to generate all."
+					},
+					"weeks": {
+						"type": "integer",
+						"minimum": 1,
+						"maximum": 52,
+						"default": 8,
+						"description": "Number of weeks ahead to generate."
+					},
+					"dry_run": {
+						"type": "boolean",
+						"default": false,
+						"description": "Preview without creating events."
+					}
+				}
+			}
+		},
+		"shelter_list_programs": {
+			"label": "List Programs",
+			"description": "Return all configured shelter event programs and their schedules.",
+			"category": "shelter-events",
+			"permission_callback": "read",
+			"schema": {
+				"type": "object",
+				"properties": {
+					"include_past": {
+						"type": "boolean",
+						"default": false
+					}
+				}
+			}
+		},
+		"shelter_cancel_event": {
+			"label": "Cancel Event Instance",
+			"description": "Mark a specific generated event instance as cancelled (does not delete).",
+			"category": "shelter-events",
+			"permission_callback": "edit_others_posts",
+			"schema": {
+				"type": "object",
+				"required": [ "event_id" ],
+				"properties": {
+					"event_id": {
+						"type": "integer",
+						"description": "Post ID of the TEC event to cancel."
+					},
+					"reason": {
+						"type": "string",
+						"description": "Cancellation reason shown to visitors."
+					}
+				}
+			}
+		}
+	}
+}

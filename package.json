@@ -1,0 +1,16 @@
+{
+	"name": "shelter-events-wrapper",
+	"version": "1.0.0",
+	"description": "Config-driven wrapper for The Events Calendar.",
+	"private": true,
+	"scripts": {
+		"start": "wp-env start",
+		"stop": "wp-env stop",
+		"lint:js": "wp-scripts lint-js assets/js/",
+		"lint:css": "wp-scripts lint-style assets/css/"
+	},
+	"devDependencies": {
+		"@wordpress/env": "^10.0.0",
+		"@wordpress/scripts": "^28.0.0"
+	}
+}

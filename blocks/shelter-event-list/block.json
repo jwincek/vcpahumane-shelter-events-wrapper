@@ -1,0 +1,45 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "shelter-events/event-list",
+	"version": "1.0.0",
+	"title": "Shelter Event List",
+	"category": "widgets",
+	"icon": "calendar-alt",
+	"description": "Displays upcoming shelter events filtered by program (BINGO, Clinic, etc.).",
+	"keywords": [ "events", "shelter", "bingo", "clinic", "calendar" ],
+	"supports": {
+		"html": false,
+		"align": [ "wide", "full" ],
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"attributes": {
+		"program": {
+			"type": "string",
+			"default": ""
+		},
+		"count": {
+			"type": "number",
+			"default": 5
+		},
+		"showCost": {
+			"type": "boolean",
+			"default": true
+		},
+		"showVenue": {
+			"type": "boolean",
+			"default": true
+		},
+		"layout": {
+			"type": "string",
+			"default": "list",
+			"enum": [ "list", "card", "compact" ]
+		}
+	},
+	"textdomain": "shelter-events",
+	"editorScript": "file:../../assets/js/editor.js",
+	"style": "file:../../assets/css/front.css"
+}

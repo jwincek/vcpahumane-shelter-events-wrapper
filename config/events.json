@@ -1,0 +1,93 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"version": "1.0.0",
+	"description": "Recurring shelter event definitions. Each key is a program slug; the generator reads this to create TEC events automatically.",
+
+	"programs": {
+		"bingo": {
+			"title": "BINGO Night",
+			"description": "Join us for BINGO every Tuesday and Saturday evening! All proceeds support shelter animals.",
+			"category": "fundraiser",
+			"recurrence": {
+				"days": [ "tuesday", "saturday" ],
+				"start_time": "18:30",
+				"end_time": "21:00",
+				"timezone": "America/New_York"
+			},
+			"venue_slug": "shelter-main-hall",
+			"organizer_slug": "vcpa-humane",
+			"cost": "20",
+			"currency_symbol": "$",
+			"featured": false,
+			"tags": [ "bingo", "fundraiser", "community" ],
+			"event_cat": [ "Fundraiser" ],
+			"meta": {
+				"_shelter_program": "bingo",
+				"_shelter_capacity": "120",
+				"_shelter_age_restriction": "18+",
+				"_shelter_contact_email": "bingo@vcpahumane.org"
+			}
+		},
+
+		"feline-spay-neuter": {
+			"title": "Feline Spay/Neuter Clinic",
+			"description": "Low-cost feline spay and neuter clinic. Appointments required — call to reserve your spot.",
+			"category": "clinic",
+			"recurrence": {
+				"days": [ "tuesday" ],
+				"start_time": "08:00",
+				"end_time": "16:00",
+				"timezone": "America/New_York"
+			},
+			"venue_slug": "shelter-veterinary-wing",
+			"organizer_slug": "vcpa-humane",
+			"cost": "50",
+			"currency_symbol": "$",
+			"featured": false,
+			"tags": [ "spay-neuter", "clinic", "cats", "veterinary" ],
+			"event_cat": [ "Clinic" ],
+			"meta": {
+				"_shelter_program": "feline-spay-neuter",
+				"_shelter_capacity": "25",
+				"_shelter_requires_appointment": "yes",
+				"_shelter_contact_email": "clinic@vcpahumane.org"
+			}
+		}
+	},
+
+	"venues": {
+		"shelter-main-hall": {
+			"venue": "VCPA Humane Society — Main Hall",
+			"address": "11827 Canon Blvd",
+			"city": "Newport News",
+			"state": "VA",
+			"zip": "23606",
+			"country": "US",
+			"phone": "(757) 595-1399"
+		},
+		"shelter-veterinary-wing": {
+			"venue": "VCPA Humane Society — Veterinary Wing",
+			"address": "11827 Canon Blvd",
+			"city": "Newport News",
+			"state": "VA",
+			"zip": "23606",
+			"country": "US",
+			"phone": "(757) 595-1399"
+		}
+	},
+
+	"organizers": {
+		"vcpa-humane": {
+			"organizer": "VCPA Humane Society",
+			"phone": "(757) 595-1399",
+			"website": "https://vcpahumane.org",
+			"email": "info@vcpahumane.org"
+		}
+	},
+
+	"generation": {
+		"lookahead_weeks": 8,
+		"duplicate_check_meta_key": "_shelter_generated_hash",
+		"allow_admin_override": true
+	}
+}

@@ -1,0 +1,5 @@
+vendor/
+node_modules/
+.wp-env/
+*.log
+.DS_Store
