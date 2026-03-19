@@ -1,10 +1,6 @@
 <?php
 /**
- * Abilities Provider — registers shelter event abilities from config.
- *
- * Each ability is a thin, testable operation with JSON Schema validation
- * and permission callbacks, following the Petstablished pattern where
- * business logic lives in abilities rather than REST endpoints or admin UI.
+ * Abilities Provider v2 — delegates to CPT-backed programs.
  *
  * @package Shelter_Events\Abilities
  */
@@ -15,12 +11,10 @@ namespace Shelter_Events\Abilities;
 
 use Shelter_Events\Core\Config;
 use Shelter_Events\Core\Event_Generator;
+use Shelter_Events\Core\Program_CPT;
 
 final class Provider {
 
-	/**
-	 * Register all abilities from config/abilities.json.
-	 */
 	public static function register(): void {
 		$abilities = Config::get_item( 'abilities', 'abilities', [] );
 
@@ -40,32 +34,24 @@ final class Provider {
 		}
 	}
 
-	// ── Ability Handlers ──────────────────────────────────────────────────────
-
 	/**
 	 * Handle: shelter_generate_events
-	 *
-	 * @param array $args Validated args from the Abilities API.
-	 * @return array Results with created event IDs.
 	 */
 	public static function handle_shelter_generate_events( array $args ): array {
-		$config   = Config::get( 'events' );
-		$programs = $config['programs'] ?? [];
-		$weeks    = $args['weeks'] ?? (int) ( $config['generation']['lookahead_weeks'] ?? 8 );
-		$dry_run  = $args['dry_run'] ?? false;
-		$results  = [];
+		$gen_config = Config::get_item( 'events', 'generation', [] );
+		$weeks      = $args['weeks'] ?? (int) ( $gen_config['lookahead_weeks'] ?? 8 );
+		$dry_run    = $args['dry_run'] ?? false;
+		$programs   = Program_CPT::get_active_programs();
+		$results    = [];
 
 		if ( ! empty( $args['program'] ) ) {
-			// Single program.
-			$slug = $args['program'];
-			if ( isset( $programs[ $slug ] ) ) {
-				$results[ $slug ] = Event_Generator::generate_for_program( $slug, $programs[ $slug ], $weeks, $dry_run );
-			}
-		} else {
-			// All programs.
-			foreach ( $programs as $slug => $program ) {
-				$results[ $slug ] = Event_Generator::generate_for_program( $slug, $program, $weeks, $dry_run );
-			}
+			// Filter to a single program by slug.
+			$target = $args['program'];
+			$programs = array_filter( $programs, fn( $p ) => $p['slug'] === $target );
+		}
+
+		foreach ( $programs as $program ) {
+			$results[ $program['slug'] ] = Event_Generator::generate_for_program( $program, $weeks, $dry_run );
 		}
 
 		return [
@@ -77,17 +63,14 @@ final class Provider {
 
 	/**
 	 * Handle: shelter_list_programs
-	 *
-	 * @param array $args Validated args.
-	 * @return array Program definitions.
 	 */
 	public static function handle_shelter_list_programs( array $args ): array {
-		$programs = Config::get_item( 'events', 'programs', [] );
+		$programs = Program_CPT::get_active_programs();
 
 		$output = [];
-		foreach ( $programs as $slug => $program ) {
+		foreach ( $programs as $program ) {
 			$output[] = [
-				'slug'        => $slug,
+				'slug'        => $program['slug'],
 				'title'       => $program['title'],
 				'description' => $program['description'] ?? '',
 				'category'    => $program['category'] ?? '',
@@ -106,26 +89,18 @@ final class Provider {
 
 	/**
 	 * Handle: shelter_cancel_event
-	 *
-	 * @param array $args Must contain 'event_id'.
-	 * @return array Result.
 	 */
 	public static function handle_shelter_cancel_event( array $args ): array {
 		$event_id = (int) $args['event_id'];
 		$post     = get_post( $event_id );
 
 		if ( ! $post || $post->post_type !== 'tribe_events' ) {
-			return [
-				'success' => false,
-				'error'   => 'Event not found.',
-			];
+			return [ 'success' => false, 'error' => 'Event not found.' ];
 		}
 
-		// Mark as cancelled via TEC's status meta + prepend title.
 		update_post_meta( $event_id, '_shelter_cancelled', '1' );
 		update_post_meta( $event_id, '_shelter_cancel_reason', sanitize_text_field( $args['reason'] ?? '' ) );
 
-		// Update title to show cancellation.
 		wp_update_post( [
 			'ID'         => $event_id,
 			'post_title' => '[CANCELLED] ' . $post->post_title,
@@ -138,17 +113,7 @@ final class Provider {
 		];
 	}
 
-	// ── Helpers ───────────────────────────────────────────────────────────────
-
-	/**
-	 * Build a permission callback from a capability string.
-	 *
-	 * @param string $capability WordPress capability.
-	 * @return callable
-	 */
 	private static function build_permission_callback( string $capability ): callable {
-		return static function () use ( $capability ): bool {
-			return current_user_can( $capability );
-		};
+		return static fn(): bool => current_user_can( $capability );
 	}
 }

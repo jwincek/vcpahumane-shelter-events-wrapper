@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Shelter Events Wrapper
- * Description: Config-driven wrapper for The Events Calendar — manages recurring shelter events (BINGO nights, spay/neuter clinics, etc.) via the TEC ORM and WP 6.9 Abilities API.
- * Version:     1.0.0
+ * Description: Manages recurring shelter events (BINGO, clinics, etc.) as a custom post type with a staff-friendly UI, generating TEC events automatically via WP-Cron.
+ * Version:     2.0.0
  * Requires at least: 6.7
  * Requires PHP: 8.1
  * Author:      VCPA Humane Society
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ── Plugin constants ──────────────────────────────────────────────────────────
-define( 'SHELTER_EVENTS_VERSION', '1.0.0' );
+define( 'SHELTER_EVENTS_VERSION', '2.0.0' );
 define( 'SHELTER_EVENTS_FILE', __FILE__ );
 define( 'SHELTER_EVENTS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHELTER_EVENTS_URL', plugin_dir_url( __FILE__ ) );
@@ -50,9 +50,17 @@ spl_autoload_register( function ( string $class ): void {
 
 // ── Activation ────────────────────────────────────────────────────────────────
 register_activation_hook( __FILE__, function (): void {
+	// Load config for schema defaults and seed data.
 	\Shelter_Events\Core\Config::init( SHELTER_EVENTS_DIR . 'config/' );
 
-	// Schedule the recurring-event generation cron if not already scheduled.
+	// Register the CPT early so rewrite rules flush correctly.
+	\Shelter_Events\Core\Program_CPT::register_post_type();
+	\Shelter_Events\Core\Taxonomy_Registry::register_taxonomies();
+
+	// Import JSON-defined programs as CPT posts (only on first activation).
+	\Shelter_Events\Core\Program_Importer::import_from_config();
+
+	// Schedule cron.
 	if ( ! wp_next_scheduled( 'shelter_events_generate_recurring' ) ) {
 		wp_schedule_event( time(), 'daily', 'shelter_events_generate_recurring' );
 	}
@@ -79,13 +87,16 @@ function shelter_events_init(): void {
 		return;
 	}
 
-	// 1. Load JSON config.
+	// 1. Load JSON config (for schema defaults, generation settings, seed data reference).
 	\Shelter_Events\Core\Config::init( SHELTER_EVENTS_DIR . 'config/' );
 
-	// 2. Register custom taxonomy for event programs (BINGO, Clinic, etc.).
+	// 2. Register the shelter_program CPT and its metabox.
+	\Shelter_Events\Core\Program_CPT::init();
+
+	// 3. Register custom taxonomy for program categories.
 	\Shelter_Events\Core\Taxonomy_Registry::init();
 
-	// 3. Register Abilities (WP 6.9+).
+	// 4. Register Abilities (WP 6.9+).
 	if ( function_exists( 'wp_register_ability_category' ) ) {
 		add_action( 'wp_abilities_api_categories_init', function (): void {
 			wp_register_ability_category( 'shelter-events', [
@@ -96,21 +107,21 @@ function shelter_events_init(): void {
 		add_action( 'wp_abilities_api_init', [ \Shelter_Events\Abilities\Provider::class, 'register' ] );
 	}
 
-	// 4. WP-Cron handler — generate upcoming recurring event instances.
+	// 5. WP-Cron handler — generate upcoming recurring event instances.
 	add_action( 'shelter_events_generate_recurring', [ \Shelter_Events\Core\Event_Generator::class, 'run' ] );
 
-	// 5. Admin settings page.
+	// 6. Admin settings / generate page.
 	if ( is_admin() ) {
 		new Shelter_Events_Admin();
 	}
 
-	// 6. Register blocks (requires TEC + WP block editor).
+	// 7. Register blocks.
 	new Shelter_Events_Blocks();
 
-	// 7. REST routes for front-end AJAX (calendar feeds, etc.).
+	// 8. REST routes.
 	add_action( 'rest_api_init', [ 'Shelter_Events_REST', 'register_routes' ] );
 
-	// 8. Enqueue front-end assets.
+	// 9. Front-end assets.
 	add_action( 'wp_enqueue_scripts', function (): void {
 		if ( is_post_type_archive( 'tribe_events' ) || is_singular( 'tribe_events' ) ) {
 			wp_enqueue_style(

@@ -1,13 +1,10 @@
 <?php
 /**
- * Event Generator — the core engine.
+ * Event Generator v2 — reads programs from the shelter_program CPT.
  *
- * Reads program definitions from config/events.json and uses the TEC ORM
- * (tribe_events()->set_args()->create()) to generate individual event
- * instances for the configured lookahead period.
- *
- * Duplicate prevention is handled via a deterministic hash stored as post
- * meta — if an event for a given program + date already exists, it is skipped.
+ * The generator queries published, active shelter_program posts via
+ * Program_CPT::get_active_programs(), then creates individual TEC
+ * event instances via the ORM for the configured lookahead period.
  *
  * @package Shelter_Events\Core
  */
@@ -24,38 +21,38 @@ use DateTimeZone;
 final class Event_Generator {
 
 	/**
-	 * Run the generation for all programs (WP-Cron entry point).
+	 * Run the generation for all active programs (WP-Cron entry point).
 	 */
 	public static function run(): void {
-		$config   = Config::get( 'events' );
-		$programs = $config['programs'] ?? [];
-		$weeks    = (int) ( $config['generation']['lookahead_weeks'] ?? 8 );
+		$gen_config = Config::get_item( 'events', 'generation', [] );
+		$weeks      = (int) ( $gen_config['lookahead_weeks'] ?? 8 );
+		$programs   = Program_CPT::get_active_programs();
 
-		foreach ( $programs as $slug => $program ) {
-			self::generate_for_program( $slug, $program, $weeks );
+		foreach ( $programs as $program ) {
+			self::generate_for_program( $program, $weeks );
 		}
 	}
 
 	/**
 	 * Generate event instances for a single program.
 	 *
-	 * @param string $slug    Program slug.
-	 * @param array  $program Program definition from config.
-	 * @param int    $weeks   Weeks to look ahead.
-	 * @param bool   $dry_run If true, return planned events without creating.
-	 * @return array List of created (or planned) event IDs / dates.
+	 * @param array $program  Program definition from Program_CPT::get_active_programs().
+	 * @param int   $weeks    Weeks to look ahead.
+	 * @param bool  $dry_run  If true, return planned events without creating.
+	 * @return array List of created (or planned) event data.
 	 */
-	public static function generate_for_program( string $slug, array $program, int $weeks = 8, bool $dry_run = false ): array {
-		$config    = Config::get( 'events' );
-		$hash_key  = $config['generation']['duplicate_check_meta_key'] ?? '_shelter_generated_hash';
+	public static function generate_for_program( array $program, int $weeks = 8, bool $dry_run = false ): array {
+		$gen_config = Config::get_item( 'events', 'generation', [] );
+		$hash_key   = $gen_config['duplicate_check_meta_key'] ?? '_shelter_generated_hash';
 		$recurrence = $program['recurrence'];
 		$tz         = new DateTimeZone( $recurrence['timezone'] ?? wp_timezone_string() );
 
-		$start = new DateTime( 'today', $tz );
-		$end   = ( clone $start )->add( new DateInterval( "P{$weeks}W" ) );
+		$start  = new DateTime( 'today', $tz );
+		$end    = ( clone $start )->add( new DateInterval( "P{$weeks}W" ) );
 		$period = new DatePeriod( $start, new DateInterval( 'P1D' ), $end );
 
 		$target_days = array_map( 'strtolower', $recurrence['days'] );
+		$slug        = $program['slug'];
 		$results     = [];
 
 		foreach ( $period as $date ) {
@@ -68,7 +65,6 @@ final class Event_Generator {
 			$event_date = $date->format( 'Y-m-d' );
 			$hash       = self::make_hash( $slug, $event_date );
 
-			// Duplicate check.
 			if ( self::event_exists( $hash_key, $hash ) ) {
 				continue;
 			}
@@ -82,7 +78,7 @@ final class Event_Generator {
 				continue;
 			}
 
-			$event_id = self::create_event( $slug, $program, $date, $hash );
+			$event_id = self::create_event( $program, $date, $hash );
 
 			if ( $event_id ) {
 				$results[] = [
@@ -98,26 +94,17 @@ final class Event_Generator {
 
 	/**
 	 * Create a single TEC event via the ORM.
-	 *
-	 * @param string    $slug    Program slug.
-	 * @param array     $program Program config.
-	 * @param DateTime  $date    The specific date for this instance.
-	 * @param string    $hash    Duplicate-prevention hash.
-	 * @return int|false Post ID on success, false on failure.
 	 */
-	private static function create_event( string $slug, array $program, DateTime $date, string $hash ): int|false {
-		$config  = Config::get( 'events' );
-		$rec     = $program['recurrence'];
-		$hash_key = $config['generation']['duplicate_check_meta_key'] ?? '_shelter_generated_hash';
+	private static function create_event( array $program, DateTime $date, string $hash ): int|false {
+		$gen_config = Config::get_item( 'events', 'generation', [] );
+		$hash_key   = $gen_config['duplicate_check_meta_key'] ?? '_shelter_generated_hash';
+		$rec        = $program['recurrence'];
 
 		$start_date = $date->format( 'Y-m-d' ) . ' ' . $rec['start_time'] . ':00';
 		$end_date   = $date->format( 'Y-m-d' ) . ' ' . $rec['end_time'] . ':00';
 
-		// Resolve venue.
-		$venue_id = self::resolve_venue( $program['venue_slug'] ?? '' );
-
-		// Resolve organizer.
-		$organizer_id = self::resolve_organizer( $program['organizer_slug'] ?? '' );
+		$venue_id     = self::resolve_venue( $program['venue'] ?? [] );
+		$organizer_id = self::resolve_organizer( $program['organizer'] ?? [] );
 
 		$args = [
 			'title'           => $program['title'] . ' — ' . $date->format( 'l, F j, Y' ),
@@ -139,141 +126,94 @@ final class Event_Generator {
 		if ( $venue_id ) {
 			$args['venue'] = $venue_id;
 		}
-
 		if ( $organizer_id ) {
 			$args['organizer'] = $organizer_id;
 		}
 
-		// Use TEC ORM to create the event.
 		$event = tribe_events()->set_args( $args )->create();
 
 		if ( ! $event instanceof \WP_Post ) {
 			return false;
 		}
 
-		// Store the dedup hash.
+		// Dedup hash.
 		update_post_meta( $event->ID, $hash_key, $hash );
 
-		// Store program slug as meta.
-		update_post_meta( $event->ID, '_shelter_program_slug', $slug );
+		// Program slug for queries.
+		update_post_meta( $event->ID, '_shelter_program_slug', $program['slug'] );
 
-		// Store any additional custom meta from config.
+		// Link back to the program CPT post.
+		if ( ! empty( $program['post_id'] ) ) {
+			update_post_meta( $event->ID, '_shelter_program_post_id', $program['post_id'] );
+		}
+
+		// Additional custom meta.
 		if ( ! empty( $program['meta'] ) ) {
 			foreach ( $program['meta'] as $key => $value ) {
-				update_post_meta( $event->ID, $key, $value );
+				if ( $value !== '' ) {
+					update_post_meta( $event->ID, $key, $value );
+				}
 			}
 		}
 
-		// Assign to shelter_program taxonomy.
-		if ( ! empty( $program['category'] ) && taxonomy_exists( 'shelter_program' ) ) {
-			wp_set_object_terms( $event->ID, $program['category'], 'shelter_program' );
+		// Assign shelter_program_cat taxonomy.
+		if ( ! empty( $program['category'] ) && taxonomy_exists( 'shelter_program_cat' ) ) {
+			wp_set_object_terms( $event->ID, $program['category'], 'shelter_program_cat' );
 		}
 
-		/**
-		 * Fires after a shelter event instance is generated.
-		 *
-		 * @param int    $event_id Post ID.
-		 * @param string $slug     Program slug.
-		 * @param array  $program  Full program config.
-		 * @param string $date     Y-m-d date string.
-		 */
-		do_action( 'shelter_events_event_created', $event->ID, $slug, $program, $date->format( 'Y-m-d' ) );
+		do_action( 'shelter_events_event_created', $event->ID, $program['slug'], $program, $date->format( 'Y-m-d' ) );
 
 		return $event->ID;
 	}
 
 	// ── Venue / Organizer resolution ──────────────────────────────────────────
 
-	/**
-	 * Find or create a TEC Venue from config.
-	 *
-	 * @param string $venue_slug Key in config venues map.
-	 * @return int|null Venue post ID or null.
-	 */
-	private static function resolve_venue( string $venue_slug ): ?int {
-		if ( empty( $venue_slug ) ) {
+	private static function resolve_venue( array $venue_data ): ?int {
+		if ( empty( $venue_data['venue'] ) || ! function_exists( 'tribe_venues' ) ) {
 			return null;
 		}
 
-		$venues = Config::get_item( 'events', 'venues', [] );
-		$venue_config = $venues[ $venue_slug ] ?? null;
-
-		if ( ! $venue_config || ! function_exists( 'tribe_venues' ) ) {
-			return null;
-		}
-
-		// Check if venue already exists by title.
 		$existing = get_posts( [
-			'post_type'  => 'tribe_venue',
-			'title'      => $venue_config['venue'],
+			'post_type'   => 'tribe_venue',
+			'title'       => $venue_data['venue'],
 			'numberposts' => 1,
-			'fields'     => 'ids',
+			'fields'      => 'ids',
 		] );
 
 		if ( ! empty( $existing ) ) {
 			return (int) $existing[0];
 		}
 
-		// Create via ORM.
-		$venue = tribe_venues()->set_args( $venue_config )->create();
-
+		$venue = tribe_venues()->set_args( $venue_data )->create();
 		return $venue instanceof \WP_Post ? $venue->ID : null;
 	}
 
-	/**
-	 * Find or create a TEC Organizer from config.
-	 *
-	 * @param string $organizer_slug Key in config organizers map.
-	 * @return int|null Organizer post ID or null.
-	 */
-	private static function resolve_organizer( string $organizer_slug ): ?int {
-		if ( empty( $organizer_slug ) ) {
-			return null;
-		}
-
-		$organizers = Config::get_item( 'events', 'organizers', [] );
-		$org_config = $organizers[ $organizer_slug ] ?? null;
-
-		if ( ! $org_config || ! function_exists( 'tribe_organizers' ) ) {
+	private static function resolve_organizer( array $org_data ): ?int {
+		if ( empty( $org_data['organizer'] ) || ! function_exists( 'tribe_organizers' ) ) {
 			return null;
 		}
 
 		$existing = get_posts( [
-			'post_type'  => 'tribe_organizer',
-			'title'      => $org_config['organizer'],
+			'post_type'   => 'tribe_organizer',
+			'title'       => $org_data['organizer'],
 			'numberposts' => 1,
-			'fields'     => 'ids',
+			'fields'      => 'ids',
 		] );
 
 		if ( ! empty( $existing ) ) {
 			return (int) $existing[0];
 		}
 
-		$organizer = tribe_organizers()->set_args( $org_config )->create();
-
+		$organizer = tribe_organizers()->set_args( $org_data )->create();
 		return $organizer instanceof \WP_Post ? $organizer->ID : null;
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
-	/**
-	 * Create a deterministic hash for duplicate detection.
-	 *
-	 * @param string $slug Program slug.
-	 * @param string $date Y-m-d date.
-	 * @return string SHA-256 hash.
-	 */
 	public static function make_hash( string $slug, string $date ): string {
 		return hash( 'sha256', "shelter-event:{$slug}:{$date}" );
 	}
 
-	/**
-	 * Check whether an event with the given hash already exists.
-	 *
-	 * @param string $meta_key The meta key to check.
-	 * @param string $hash     The hash value.
-	 * @return bool
-	 */
 	private static function event_exists( string $meta_key, string $hash ): bool {
 		global $wpdb;
 

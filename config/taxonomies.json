@@ -1,15 +1,15 @@
 {
 	"taxonomies": {
-		"shelter_program": {
-			"post_types": [ "tribe_events" ],
+		"shelter_program_cat": {
+			"post_types": [ "tribe_events", "shelter_program" ],
 			"args": {
 				"labels": {
-					"name": "Programs",
-					"singular_name": "Program",
-					"menu_name": "Shelter Programs",
-					"add_new_item": "Add New Program",
-					"edit_item": "Edit Program",
-					"search_items": "Search Programs"
+					"name": "Program Categories",
+					"singular_name": "Program Category",
+					"menu_name": "Program Categories",
+					"add_new_item": "Add New Category",
+					"edit_item": "Edit Category",
+					"search_items": "Search Categories"
 				},
 				"public": true,
 				"hierarchical": true,

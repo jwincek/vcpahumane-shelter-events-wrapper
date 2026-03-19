@@ -2,8 +2,8 @@
 /**
  * Config-driven taxonomy registration.
  *
- * Reads taxonomies.json and registers custom taxonomies against TEC's
- * tribe_events post type, seeding default terms on first run.
+ * Reads taxonomies.json and registers custom taxonomies against both
+ * the TEC events post type and the shelter_program CPT.
  *
  * @package Shelter_Events\Core
  */
@@ -14,23 +14,16 @@ namespace Shelter_Events\Core;
 
 final class Taxonomy_Registry {
 
-	/**
-	 * Hook into WordPress init.
-	 */
 	public static function init(): void {
-		add_action( 'init', [ __CLASS__, 'register_taxonomies' ], 11 ); // After TEC registers its post type.
+		add_action( 'init', [ __CLASS__, 'register_taxonomies' ], 11 );
 		add_action( 'init', [ __CLASS__, 'seed_default_terms' ], 12 );
 	}
 
-	/**
-	 * Register taxonomies from config.
-	 */
 	public static function register_taxonomies(): void {
 		$taxonomies = Config::get_item( 'taxonomies', 'taxonomies', [] );
 
 		foreach ( $taxonomies as $slug => $definition ) {
 			if ( taxonomy_exists( $slug ) ) {
-				// Already registered — just attach to our post types.
 				foreach ( $definition['post_types'] as $pt ) {
 					register_taxonomy_for_object_type( $slug, $pt );
 				}
@@ -45,9 +38,6 @@ final class Taxonomy_Registry {
 		}
 	}
 
-	/**
-	 * Insert default terms if they don't already exist.
-	 */
 	public static function seed_default_terms(): void {
 		$taxonomies = Config::get_item( 'taxonomies', 'taxonomies', [] );
 

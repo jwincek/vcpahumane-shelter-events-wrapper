@@ -1,12 +1,9 @@
 <?php
 /**
- * Admin settings page for the Shelter Events Wrapper.
+ * Admin page for event generation — now reads programs from CPT.
  *
- * Provides:
- * - Overview of configured programs and their schedules
- * - "Generate Now" button to trigger immediate event creation
- * - Log of recently generated events
- * - Override controls for individual programs
+ * The program configuration itself lives in the shelter_program CPT
+ * editor. This page just shows an overview and the Generate Now button.
  *
  * @package Shelter_Events
  */
@@ -21,23 +18,17 @@ class Shelter_Events_Admin {
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 	}
 
-	/**
-	 * Add submenu under Events (The Events Calendar).
-	 */
 	public function add_menu_page(): void {
 		add_submenu_page(
 			'edit.php?post_type=tribe_events',
-			__( 'Shelter Programs', 'shelter-events' ),
-			__( 'Shelter Programs', 'shelter-events' ),
+			__( 'Generate Events', 'shelter-events' ),
+			__( 'Generate Events', 'shelter-events' ),
 			'manage_options',
-			'shelter-events-programs',
+			'shelter-events-generate',
 			[ $this, 'render_page' ]
 		);
 	}
 
-	/**
-	 * Handle the "Generate Now" form submission.
-	 */
 	public function handle_generate_action(): void {
 		if ( ! isset( $_POST['shelter_generate_nonce'] ) ) {
 			return;
@@ -51,48 +42,30 @@ class Shelter_Events_Admin {
 			wp_die( __( 'Insufficient permissions.', 'shelter-events' ) );
 		}
 
-		$program = sanitize_text_field( $_POST['program'] ?? '' );
-		$weeks   = (int) ( $_POST['weeks'] ?? 8 );
-		$dry_run = ! empty( $_POST['dry_run'] );
+		$program_slug = sanitize_text_field( $_POST['program'] ?? '' );
+		$weeks        = (int) ( $_POST['weeks'] ?? 8 );
+		$dry_run      = ! empty( $_POST['dry_run'] );
 
-		$config   = \Shelter_Events\Core\Config::get( 'events' );
-		$programs = $config['programs'] ?? [];
-		$results  = [];
+		$args = [
+			'program' => $program_slug ?: null,
+			'weeks'   => $weeks,
+			'dry_run' => $dry_run,
+		];
 
-		if ( $program && isset( $programs[ $program ] ) ) {
-			$results[ $program ] = \Shelter_Events\Core\Event_Generator::generate_for_program(
-				$program,
-				$programs[ $program ],
-				$weeks,
-				$dry_run
-			);
-		} else {
-			foreach ( $programs as $slug => $prog ) {
-				$results[ $slug ] = \Shelter_Events\Core\Event_Generator::generate_for_program(
-					$slug,
-					$prog,
-					$weeks,
-					$dry_run
-				);
-			}
-		}
+		$results = \Shelter_Events\Abilities\Provider::handle_shelter_generate_events( $args );
 
-		// Store results in transient for display.
 		set_transient( 'shelter_events_last_generation', $results, 300 );
 
 		wp_safe_redirect( add_query_arg( [
-			'page'      => 'shelter-events-programs',
+			'page'      => 'shelter-events-generate',
 			'generated' => '1',
 			'dry_run'   => $dry_run ? '1' : '0',
 		], admin_url( 'edit.php?post_type=tribe_events' ) ) );
 		exit;
 	}
 
-	/**
-	 * Enqueue admin styles.
-	 */
 	public function enqueue_admin_assets( string $hook ): void {
-		if ( ! str_contains( $hook, 'shelter-events-programs' ) ) {
+		if ( ! str_contains( $hook, 'shelter-events-generate' ) ) {
 			return;
 		}
 
@@ -104,84 +77,109 @@ class Shelter_Events_Admin {
 		);
 	}
 
-	/**
-	 * Render the admin page.
-	 */
 	public function render_page(): void {
-		$config   = \Shelter_Events\Core\Config::get( 'events' );
-		$programs = $config['programs'] ?? [];
-		$gen      = $config['generation'] ?? [];
-		$results  = get_transient( 'shelter_events_last_generation' );
-
+		$programs  = \Shelter_Events\Core\Program_CPT::get_active_programs();
+		$gen       = \Shelter_Events\Core\Config::get_item( 'events', 'generation', [] );
+		$results   = get_transient( 'shelter_events_last_generation' );
 		$next_cron = wp_next_scheduled( 'shelter_events_generate_recurring' );
 		?>
 		<div class="wrap shelter-events-admin">
-			<h1><?php esc_html_e( 'Shelter Event Programs', 'shelter-events' ); ?></h1>
+			<h1><?php esc_html_e( 'Generate Shelter Events', 'shelter-events' ); ?></h1>
 
 			<?php if ( isset( $_GET['generated'] ) ) : ?>
 				<div class="notice notice-success is-dismissible">
 					<p>
 						<?php
-						$mode = ( $_GET['dry_run'] ?? '0' ) === '1'
-							? __( 'Dry run complete — no events were created.', 'shelter-events' )
-							: __( 'Events generated successfully!', 'shelter-events' );
-						echo esc_html( $mode );
+						echo esc_html(
+							( $_GET['dry_run'] ?? '0' ) === '1'
+								? __( 'Dry run complete — no events were created.', 'shelter-events' )
+								: __( 'Events generated successfully!', 'shelter-events' )
+						);
 						?>
 					</p>
 				</div>
 			<?php endif; ?>
 
-			<!-- Program Overview -->
+			<!-- Active Programs Overview -->
 			<div class="shelter-card">
-				<h2><?php esc_html_e( 'Configured Programs', 'shelter-events' ); ?></h2>
-				<table class="wp-list-table widefat fixed striped">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Program', 'shelter-events' ); ?></th>
-							<th><?php esc_html_e( 'Days', 'shelter-events' ); ?></th>
-							<th><?php esc_html_e( 'Time', 'shelter-events' ); ?></th>
-							<th><?php esc_html_e( 'Venue', 'shelter-events' ); ?></th>
-							<th><?php esc_html_e( 'Cost', 'shelter-events' ); ?></th>
-							<th><?php esc_html_e( 'Category', 'shelter-events' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $programs as $slug => $prog ) : ?>
+				<h2>
+					<?php esc_html_e( 'Active Programs', 'shelter-events' ); ?>
+					<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=shelter_program' ) ); ?>"
+						class="page-title-action">
+						<?php esc_html_e( 'Manage Programs', 'shelter-events' ); ?>
+					</a>
+					<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=shelter_program' ) ); ?>"
+						class="page-title-action">
+						<?php esc_html_e( 'Add New', 'shelter-events' ); ?>
+					</a>
+				</h2>
+
+				<?php if ( empty( $programs ) ) : ?>
+					<p class="description">
+						<?php
+						printf(
+							/* translators: %s = URL to add new program */
+							__( 'No active programs found. <a href="%s">Create one</a> to get started.', 'shelter-events' ),
+							esc_url( admin_url( 'post-new.php?post_type=shelter_program' ) )
+						);
+						?>
+					</p>
+				<?php else : ?>
+					<table class="wp-list-table widefat fixed striped">
+						<thead>
 							<tr>
-								<td>
-									<strong><?php echo esc_html( $prog['title'] ); ?></strong>
-									<br><code><?php echo esc_html( $slug ); ?></code>
-								</td>
-								<td><?php echo esc_html( implode( ', ', array_map( 'ucfirst', $prog['recurrence']['days'] ) ) ); ?></td>
-								<td><?php echo esc_html( $prog['recurrence']['start_time'] . ' – ' . $prog['recurrence']['end_time'] ); ?></td>
-								<td><?php echo esc_html( $prog['venue_slug'] ?? '—' ); ?></td>
-								<td><?php echo esc_html( ( $prog['currency_symbol'] ?? '$' ) . ( $prog['cost'] ?? 'Free' ) ); ?></td>
-								<td><?php echo esc_html( ucfirst( $prog['category'] ?? '' ) ); ?></td>
+								<th><?php esc_html_e( 'Program', 'shelter-events' ); ?></th>
+								<th><?php esc_html_e( 'Days', 'shelter-events' ); ?></th>
+								<th><?php esc_html_e( 'Time', 'shelter-events' ); ?></th>
+								<th><?php esc_html_e( 'Cost', 'shelter-events' ); ?></th>
+								<th><?php esc_html_e( 'Venue', 'shelter-events' ); ?></th>
+								<th></th>
 							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							<?php foreach ( $programs as $prog ) : ?>
+								<tr>
+									<td><strong><?php echo esc_html( $prog['title'] ); ?></strong></td>
+									<td>
+										<?php
+										echo esc_html( implode( ', ', array_map(
+											fn( $d ) => ucfirst( substr( $d, 0, 3 ) ),
+											$prog['recurrence']['days']
+										) ) );
+										?>
+									</td>
+									<td><?php echo esc_html( $prog['recurrence']['start_time'] . ' – ' . $prog['recurrence']['end_time'] ); ?></td>
+									<td>
+										<?php
+										$cost = $prog['cost'];
+										echo esc_html(
+											( $cost === '0' || $cost === '' )
+												? __( 'Free', 'shelter-events' )
+												: ( $prog['currency_symbol'] ?? '$' ) . $cost
+										);
+										?>
+									</td>
+									<td><?php echo esc_html( $prog['venue']['venue'] ?? '—' ); ?></td>
+									<td>
+										<a href="<?php echo esc_url( get_edit_post_link( $prog['post_id'] ) ); ?>">
+											<?php esc_html_e( 'Edit', 'shelter-events' ); ?>
+										</a>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
 			</div>
 
 			<!-- Generate Form -->
 			<div class="shelter-card">
 				<h2><?php esc_html_e( 'Generate Events', 'shelter-events' ); ?></h2>
-				<p class="description">
-					<?php
-					printf(
-						/* translators: %d = lookahead weeks */
-						esc_html__( 'Create event instances for the next %d weeks. The daily cron job does this automatically.', 'shelter-events' ),
-						(int) ( $gen['lookahead_weeks'] ?? 8 )
-					);
-					?>
-				</p>
-
 				<?php if ( $next_cron ) : ?>
 					<p class="description">
 						<?php
 						printf(
-							/* translators: %s = formatted date */
-							esc_html__( 'Next scheduled auto-generation: %s', 'shelter-events' ),
+							esc_html__( 'Next automatic generation: %s', 'shelter-events' ),
 							esc_html( wp_date( 'F j, Y \a\t g:i A', $next_cron ) )
 						);
 						?>
@@ -196,9 +194,9 @@ class Shelter_Events_Admin {
 							<th><label for="program"><?php esc_html_e( 'Program', 'shelter-events' ); ?></label></th>
 							<td>
 								<select name="program" id="program">
-									<option value=""><?php esc_html_e( '— All Programs —', 'shelter-events' ); ?></option>
-									<?php foreach ( $programs as $slug => $prog ) : ?>
-										<option value="<?php echo esc_attr( $slug ); ?>">
+									<option value=""><?php esc_html_e( '— All Active Programs —', 'shelter-events' ); ?></option>
+									<?php foreach ( $programs as $prog ) : ?>
+										<option value="<?php echo esc_attr( $prog['slug'] ); ?>">
 											<?php echo esc_html( $prog['title'] ); ?>
 										</option>
 									<?php endforeach; ?>
@@ -206,7 +204,7 @@ class Shelter_Events_Admin {
 							</td>
 						</tr>
 						<tr>
-							<th><label for="weeks"><?php esc_html_e( 'Weeks Ahead', 'shelter-events' ); ?></label></th>
+							<th><label for="weeks"><?php esc_html_e( 'Weeks ahead', 'shelter-events' ); ?></label></th>
 							<td>
 								<input type="number" name="weeks" id="weeks" min="1" max="52"
 									value="<?php echo esc_attr( (string) ( $gen['lookahead_weeks'] ?? 8 ) ); ?>"
@@ -218,7 +216,7 @@ class Shelter_Events_Admin {
 							<td>
 								<label>
 									<input type="checkbox" name="dry_run" value="1" />
-									<?php esc_html_e( 'Dry run (preview only, no events created)', 'shelter-events' ); ?>
+									<?php esc_html_e( 'Dry run (preview only)', 'shelter-events' ); ?>
 								</label>
 							</td>
 						</tr>
@@ -228,14 +226,14 @@ class Shelter_Events_Admin {
 				</form>
 			</div>
 
-			<!-- Last Generation Results -->
-			<?php if ( is_array( $results ) && ! empty( $results ) ) : ?>
+			<!-- Results -->
+			<?php if ( is_array( $results ) && ! empty( $results['programs'] ?? [] ) ) : ?>
 				<div class="shelter-card">
 					<h2><?php esc_html_e( 'Last Generation Results', 'shelter-events' ); ?></h2>
-					<?php foreach ( $results as $slug => $events ) : ?>
-						<h3><?php echo esc_html( $programs[ $slug ]['title'] ?? $slug ); ?></h3>
+					<?php foreach ( $results['programs'] as $slug => $events ) : ?>
+						<h3><?php echo esc_html( $slug ); ?></h3>
 						<?php if ( empty( $events ) ) : ?>
-							<p class="description"><?php esc_html_e( 'No new events to generate (all dates already exist).', 'shelter-events' ); ?></p>
+							<p class="description"><?php esc_html_e( 'No new events needed (all dates already exist).', 'shelter-events' ); ?></p>
 						<?php else : ?>
 							<ul class="shelter-results-list">
 								<?php foreach ( $events as $event ) : ?>

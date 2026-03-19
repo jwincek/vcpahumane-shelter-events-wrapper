@@ -1,7 +1,7 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"version": "1.0.0",
-	"description": "Recurring shelter event definitions. Each key is a program slug; the generator reads this to create TEC events automatically.",
+	"version": "2.0.0",
+	"description": "Seed data for initial program import and generation settings. After first activation, programs are managed via the shelter_program CPT in the WordPress admin.",
 
 	"programs": {
 		"bingo": {
