@@ -119,6 +119,11 @@ final class Event_Generator {
 			'tag'             => $program['tags'] ?? [],
 		];
 
+		// Map the program's website URL to TEC's native Event Website field (_EventURL).
+		if ( ! empty( $program['website_url'] ) ) {
+			$args['url'] = $program['website_url'];
+		}
+
 		if ( ! empty( $program['event_cat'] ) ) {
 			$args['category'] = $program['event_cat'];
 		}
@@ -154,6 +159,11 @@ final class Event_Generator {
 					update_post_meta( $event->ID, $key, $value );
 				}
 			}
+		}
+
+		// Store Facebook URL as separate meta (TEC only has one _EventURL field).
+		if ( ! empty( $program['facebook_url'] ) ) {
+			update_post_meta( $event->ID, '_shelter_facebook_url', $program['facebook_url'] );
 		}
 
 		// Assign shelter_program_cat taxonomy.

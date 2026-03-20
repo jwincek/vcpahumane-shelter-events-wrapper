@@ -122,6 +122,16 @@ final class Program_CPT {
 			'default' => '',
 			'label'   => 'Age restriction',
 		],
+		'website_url' => [
+			'type'    => 'string',
+			'default' => '',
+			'label'   => 'Event website URL',
+		],
+		'facebook_url' => [
+			'type'    => 'string',
+			'default' => '',
+			'label'   => 'Facebook page URL',
+		],
 		'tags' => [
 			'type'    => 'string',
 			'default' => '',
@@ -403,6 +413,26 @@ final class Program_CPT {
 				</div>
 			</fieldset>
 
+			<!-- Section: Event Links -->
+			<fieldset class="shelter-metabox__section">
+				<legend><?php esc_html_e( 'Event Links', 'shelter-events' ); ?></legend>
+				<p class="description" style="margin-top:0;">
+					<?php esc_html_e( 'The website URL is written to each generated event\'s "Event Website" field in The Events Calendar.', 'shelter-events' ); ?>
+				</p>
+				<div class="shelter-metabox__field">
+					<label for="shelter_prog_website_url"><?php esc_html_e( 'Website / Booking URL', 'shelter-events' ); ?></label>
+					<input type="url" id="shelter_prog_website_url" name="shelter_prog_website_url"
+						value="<?php echo esc_attr( $meta['website_url'] ); ?>" class="widefat"
+						placeholder="<?php esc_attr_e( 'e.g. https://www.supersaas.com/schedule/Your_Org/CATS', 'shelter-events' ); ?>" />
+				</div>
+				<div class="shelter-metabox__field">
+					<label for="shelter_prog_facebook_url"><?php esc_html_e( 'Facebook Page URL', 'shelter-events' ); ?></label>
+					<input type="url" id="shelter_prog_facebook_url" name="shelter_prog_facebook_url"
+						value="<?php echo esc_attr( $meta['facebook_url'] ); ?>" class="widefat"
+						placeholder="<?php esc_attr_e( 'e.g. https://www.facebook.com/YourShelterBingo', 'shelter-events' ); ?>" />
+				</div>
+			</fieldset>
+
 			<!-- Section: Event Display -->
 			<fieldset class="shelter-metabox__section">
 				<legend><?php esc_html_e( 'Event Display', 'shelter-events' ); ?></legend>
@@ -466,6 +496,7 @@ final class Program_CPT {
 			'organizer_name', 'organizer_phone', 'organizer_email', 'organizer_website',
 			'cost', 'currency_symbol', 'capacity', 'contact_email',
 			'age_restriction', 'tags',
+			'website_url', 'facebook_url',
 		];
 
 		foreach ( $text_fields as $field ) {
@@ -605,6 +636,8 @@ final class Program_CPT {
 				'currency_symbol' => $meta['currency_symbol'],
 				'featured'        => $meta['featured'] === 'yes',
 				'tags'            => array_filter( array_map( 'trim', explode( ',', $meta['tags'] ) ) ),
+				'website_url'     => $meta['website_url'],
+				'facebook_url'    => $meta['facebook_url'],
 				'meta'            => [
 					'_shelter_program'              => $post->post_name,
 					'_shelter_capacity'             => $meta['capacity'],

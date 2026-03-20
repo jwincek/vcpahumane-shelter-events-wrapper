@@ -74,6 +74,8 @@ final class Program_Importer {
 				'featured'             => ! empty( $program['featured'] ) ? 'yes' : 'no',
 				'tags'                 => implode( ', ', $program['tags'] ?? [] ),
 				'active'               => 'yes',
+				'website_url'          => $program['website_url'] ?? '',
+				'facebook_url'         => $program['facebook_url'] ?? '',
 			];
 
 			// Resolve venue from JSON venue slug.
