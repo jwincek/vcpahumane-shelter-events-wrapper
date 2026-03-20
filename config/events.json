@@ -5,27 +5,29 @@
 
 	"programs": {
 		"bingo": {
-			"title": "BINGO Night",
-			"description": "Join us for BINGO every Tuesday and Saturday evening! All proceeds support shelter animals.",
+			"title": "BINGO!",
+			"description": "Join us for BINGO every Tuesday and Saturday evening! All proceeds support the Spay/Neuter program for shelter animals. Doors open at 5 and BINGO starts at 7.",
 			"category": "fundraiser",
 			"recurrence": {
 				"days": [ "tuesday", "saturday" ],
-				"start_time": "18:30",
+				"start_time": "17:00",
 				"end_time": "21:00",
 				"timezone": "America/New_York"
 			},
-			"venue_slug": "shelter-main-hall",
-			"organizer_slug": "vcpa-humane",
-			"cost": "20",
+			"venue_slug": "lee-bessler-hall",
+			"organizer_slug": "venango-county-humane-society",
+			"cost": "",
 			"currency_symbol": "$",
 			"featured": false,
+			"website_url": "https://www.facebook.com/VENANGOCOUNTYHUMANESOCIETYBINGO",
+			"facebook_url": "https://www.facebook.com/VENANGOCOUNTYHUMANESOCIETYBINGO",
 			"tags": [ "bingo", "fundraiser", "community" ],
 			"event_cat": [ "Fundraiser" ],
 			"meta": {
 				"_shelter_program": "bingo",
-				"_shelter_capacity": "120",
-				"_shelter_age_restriction": "18+",
-				"_shelter_contact_email": "bingo@vcpahumane.org"
+				"_shelter_capacity": "",
+				"_shelter_age_restriction": "",
+				"_shelter_contact_email": "venangocountyhumanesociety@gmail.com"
 			}
 		},
 
@@ -36,52 +38,54 @@
 			"recurrence": {
 				"days": [ "tuesday" ],
 				"start_time": "08:00",
-				"end_time": "16:00",
+				"end_time": "17:00",
 				"timezone": "America/New_York"
 			},
-			"venue_slug": "shelter-veterinary-wing",
-			"organizer_slug": "vcpa-humane",
-			"cost": "50",
+			"venue_slug": "vchs-shelter",
+			"organizer_slug": "venango-county-humane-society",
+			"cost": "",
 			"currency_symbol": "$",
 			"featured": false,
+			"website_url": "https://www.supersaas.com/schedule/Venango_Co_Humane_Society/CATS",
+			"facebook_url": "",
 			"tags": [ "spay-neuter", "clinic", "cats", "veterinary" ],
 			"event_cat": [ "Clinic" ],
 			"meta": {
 				"_shelter_program": "feline-spay-neuter",
 				"_shelter_capacity": "25",
 				"_shelter_requires_appointment": "yes",
-				"_shelter_contact_email": "clinic@vcpahumane.org"
+				"_shelter_contact_email": "venangocountyhumanesociety@gmail.com"
 			}
 		}
 	},
 
 	"venues": {
-		"shelter-main-hall": {
-			"venue": "VCPA Humane Society — Main Hall",
-			"address": "11827 Canon Blvd",
-			"city": "Newport News",
-			"state": "VA",
-			"zip": "23606",
+		"lee-bessler-hall": {
+			"venue": "Lee Bessler Hall",
+			"address": "3978 State Route 257",
+			"city": "Seneca",
+			"state": "PA",
+			"zip": "16346",
 			"country": "US",
-			"phone": "(757) 595-1399"
+			"phone": "(814) 676-1471"
 		},
-		"shelter-veterinary-wing": {
-			"venue": "VCPA Humane Society — Veterinary Wing",
-			"address": "11827 Canon Blvd",
-			"city": "Newport News",
-			"state": "VA",
-			"zip": "23606",
+		"vchs-shelter": {
+			"venue": "VCHS Shelter",
+			"address": "286 S Main St",
+			"city": "Seneca",
+			"state": "PA",
+			"zip": "16346",
 			"country": "US",
-			"phone": "(757) 595-1399"
+			"phone": "(814) 677-4040"
 		}
 	},
 
 	"organizers": {
 		"vcpa-humane": {
-			"organizer": "VCPA Humane Society",
-			"phone": "(757) 595-1399",
+			"organizer": "Venango County Humane Society",
+			"phone": "(814) 677-4040",
 			"website": "https://vcpahumane.org",
-			"email": "info@vcpahumane.org"
+			"email": "venangocountyhumanesociety@gmail.com"
 		}
 	},
 
