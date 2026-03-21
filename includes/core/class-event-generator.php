@@ -189,6 +189,10 @@ final class Event_Generator {
 	/**
 	 * Find or create a TEC Venue. Public so Event_Syncer can reuse it.
 	 *
+	 * Uses a direct DB query for the title match because get_posts()
+	 * does not support 'title' as a query parameter — it silently
+	 * ignores it, causing duplicate venues on every save.
+	 *
 	 * @param array $venue_data Venue fields from the program config.
 	 * @return int|null Venue post ID or null.
 	 */
@@ -197,17 +201,28 @@ final class Event_Generator {
 			return null;
 		}
 
-		$existing = get_posts( [
-			'post_type'   => 'tribe_venue',
-			'title'       => $venue_data['venue'],
-			'numberposts' => 1,
-			'fields'      => 'ids',
-		] );
+		global $wpdb;
 
-		if ( ! empty( $existing ) ) {
-			return (int) $existing[0];
+		$existing_id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT ID FROM {$wpdb->posts}
+				 WHERE post_type = 'tribe_venue'
+				   AND post_title = %s
+				   AND post_status IN ('publish', 'draft')
+				 LIMIT 1",
+				$venue_data['venue']
+			)
+		);
+
+		if ( $existing_id ) {
+			// Ensure the existing venue is published.
+			if ( get_post_status( $existing_id ) === 'draft' ) {
+				wp_update_post( [ 'ID' => (int) $existing_id, 'post_status' => 'publish' ] );
+			}
+			return (int) $existing_id;
 		}
 
+		$venue_data['status'] = 'publish';
 		$venue = tribe_venues()->set_args( $venue_data )->create();
 		return $venue instanceof \WP_Post ? $venue->ID : null;
 	}
@@ -223,17 +238,28 @@ final class Event_Generator {
 			return null;
 		}
 
-		$existing = get_posts( [
-			'post_type'   => 'tribe_organizer',
-			'title'       => $org_data['organizer'],
-			'numberposts' => 1,
-			'fields'      => 'ids',
-		] );
+		global $wpdb;
 
-		if ( ! empty( $existing ) ) {
-			return (int) $existing[0];
+		$existing_id = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT ID FROM {$wpdb->posts}
+				 WHERE post_type = 'tribe_organizer'
+				   AND post_title = %s
+				   AND post_status IN ('publish', 'draft')
+				 LIMIT 1",
+				$org_data['organizer']
+			)
+		);
+
+		if ( $existing_id ) {
+			// Ensure the existing organizer is published.
+			if ( get_post_status( $existing_id ) === 'draft' ) {
+				wp_update_post( [ 'ID' => (int) $existing_id, 'post_status' => 'publish' ] );
+			}
+			return (int) $existing_id;
 		}
 
+		$org_data['status'] = 'publish';
 		$organizer = tribe_organizers()->set_args( $org_data )->create();
 		return $organizer instanceof \WP_Post ? $organizer->ID : null;
 	}
