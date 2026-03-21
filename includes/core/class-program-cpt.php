@@ -236,6 +236,26 @@ final class Program_CPT {
 		wp_nonce_field( 'shelter_program_save', 'shelter_program_nonce' );
 
 		$meta = self::get_all_meta( $post->ID );
+
+		// Show sync feedback if events were just updated.
+		$sync_count = get_transient( 'shelter_events_sync_result_' . $post->ID );
+		if ( $sync_count ) {
+			delete_transient( 'shelter_events_sync_result_' . $post->ID );
+			printf(
+				'<div class="notice notice-success inline" style="margin:0 0 12px;"><p>%s</p></div>',
+				sprintf(
+					/* translators: %d = number of events updated */
+					esc_html( _n(
+						'%d existing event was updated to match this program.',
+						'%d existing events were updated to match this program.',
+						$sync_count,
+						'shelter-events'
+					) ),
+					$sync_count
+				)
+			);
+		}
+
 		$days_of_week = [
 			'monday'    => __( 'Monday', 'shelter-events' ),
 			'tuesday'   => __( 'Tuesday', 'shelter-events' ),
@@ -250,12 +270,21 @@ final class Program_CPT {
 
 			<!-- Status Banner -->
 			<div class="shelter-metabox__status <?php echo $meta['active'] === 'yes' ? 'shelter-metabox__status--active' : 'shelter-metabox__status--paused'; ?>">
-				<label>
-					<input type="checkbox" name="shelter_prog_active" value="yes"
-						<?php checked( $meta['active'], 'yes' ); ?> />
-					<strong><?php esc_html_e( 'Active', 'shelter-events' ); ?></strong>
-					— <?php esc_html_e( 'When checked, the daily cron will generate event instances for this program.', 'shelter-events' ); ?>
-				</label>
+				<div>
+					<label>
+						<input type="checkbox" name="shelter_prog_active" value="yes"
+							<?php checked( $meta['active'], 'yes' ); ?> />
+						<strong><?php esc_html_e( 'Active', 'shelter-events' ); ?></strong>
+						— <?php esc_html_e( 'When checked, the daily cron will generate event instances for this program.', 'shelter-events' ); ?>
+					</label>
+				</div>
+				<div class="shelter-metabox__sync-option">
+					<label>
+						<input type="checkbox" name="shelter_sync_include_past" value="1" />
+						<?php esc_html_e( 'Also update past events when saving changes', 'shelter-events' ); ?>
+					</label>
+					<span class="description"><?php esc_html_e( '(Leave unchecked to only update future events.)', 'shelter-events' ); ?></span>
+				</div>
 			</div>
 
 			<!-- Section: Schedule -->

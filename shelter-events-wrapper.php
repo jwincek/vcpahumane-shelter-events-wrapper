@@ -3,7 +3,7 @@
  * Plugin Name: Shelter Events Wrapper
  * Description: Manages recurring shelter events (BINGO, clinics, etc.) as a custom post type with a staff-friendly UI, generating TEC events automatically via WP-Cron.
  * Version:     2.0.0
- * Requires at least: 6.7
+ * Requires at least: 6.9
  * Requires PHP: 8.1
  * Author:      VCPA Humane Society
  * Text Domain: shelter-events
@@ -95,6 +95,9 @@ function shelter_events_init(): void {
 
 	// 3. Register custom taxonomy for program categories.
 	\Shelter_Events\Core\Taxonomy_Registry::init();
+
+	// 3a. Event Syncer — propagates program changes to existing TEC events on save.
+	\Shelter_Events\Core\Event_Syncer::init();
 
 	// 4. Register Abilities (WP 6.9+).
 	if ( function_exists( 'wp_register_ability_category' ) ) {

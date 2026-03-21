@@ -36,6 +36,19 @@
 	margin-right: 6px;
 }
 
+.shelter-metabox__sync-option {
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid rgba(0, 0, 0, 0.08);
+	font-size: 13px;
+}
+
+.shelter-metabox__sync-option .description {
+	color: #888;
+	font-style: italic;
+	margin-left: 4px;
+}
+
 /* ── Sections ─────────────────────────────────────────────────────────── */
 
 .shelter-metabox__section {

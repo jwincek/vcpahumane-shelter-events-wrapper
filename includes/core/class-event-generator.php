@@ -179,6 +179,20 @@ final class Event_Generator {
 	// ── Venue / Organizer resolution ──────────────────────────────────────────
 
 	private static function resolve_venue( array $venue_data ): ?int {
+		return self::resolve_venue_public( $venue_data );
+	}
+
+	private static function resolve_organizer( array $org_data ): ?int {
+		return self::resolve_organizer_public( $org_data );
+	}
+
+	/**
+	 * Find or create a TEC Venue. Public so Event_Syncer can reuse it.
+	 *
+	 * @param array $venue_data Venue fields from the program config.
+	 * @return int|null Venue post ID or null.
+	 */
+	public static function resolve_venue_public( array $venue_data ): ?int {
 		if ( empty( $venue_data['venue'] ) || ! function_exists( 'tribe_venues' ) ) {
 			return null;
 		}
@@ -198,7 +212,13 @@ final class Event_Generator {
 		return $venue instanceof \WP_Post ? $venue->ID : null;
 	}
 
-	private static function resolve_organizer( array $org_data ): ?int {
+	/**
+	 * Find or create a TEC Organizer. Public so Event_Syncer can reuse it.
+	 *
+	 * @param array $org_data Organizer fields from the program config.
+	 * @return int|null Organizer post ID or null.
+	 */
+	public static function resolve_organizer_public( array $org_data ): ?int {
 		if ( empty( $org_data['organizer'] ) || ! function_exists( 'tribe_organizers' ) ) {
 			return null;
 		}
