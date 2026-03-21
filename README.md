@@ -6,7 +6,7 @@ Built on the same layered architecture as [vcpahumane-petstablished-sync](https:
 
 ## Requirements
 
-- WordPress 6.7+
+- WordPress 6.9+
 - PHP 8.1+
 - [The Events Calendar](https://wordpress.org/plugins/the-events-calendar/) (free version)
 
@@ -17,65 +17,131 @@ Built on the same layered architecture as [vcpahumane-petstablished-sync](https:
 3. On activation, the plugin imports two starter programs (BINGO Night and Feline Spay/Neuter Clinic) from the seed data in `config/events.json`.
 4. Navigate to **Events → All Programs** to manage programs, or **Events → Generate Events** to trigger event creation.
 
-## How It Works
+---
 
-### Programs as a Custom Post Type
+## Staff Guide
 
-Each recurring program (BINGO, Clinic, Adoption Saturday, etc.) is a `shelter_program` post that staff create and edit in the WordPress admin. The post editor includes a **dedicated settings panel** below the content area where staff configure:
+This section is written for non-technical shelter staff who manage the event calendar day-to-day.
 
-- **Schedule** — pill-style day-of-week selectors (click Tuesday + Saturday for BINGO), start/end times, and timezone.
-- **Venue** — name, street address, city, state, and ZIP.
-- **Organizer** — name, phone, email, and website.
-- **Pricing & Logistics** — cost, currency, capacity, age restriction, contact email, and whether appointments are required.
-- **Event Display** — tags applied to generated events and a featured-event toggle.
-- **Active toggle** — a green/amber status banner at the top. Unchecking "Active" pauses event generation for that program without deleting it.
+### Creating a New Program
 
-The program list table in the admin shows days, time, cost, and active status at a glance.
+1. In the WordPress admin, go to **Events → All Programs → Add New Program**.
+2. Enter a name (e.g. "Puppy Yoga") and a description in the main editor. The description will appear on each generated calendar event.
+3. Scroll down to the **Event Schedule Settings** panel and fill in the sections:
 
-### Event Generation
+**Schedule**
+- Click the day-of-week pills to select which days this program runs (e.g. click **Tuesday** and **Saturday** for BINGO).
+- Set the start and end times.
+- Choose the timezone (defaults to America/New_York).
 
-A daily WP-Cron job queries all published, active `shelter_program` posts and creates individual TEC event instances for each scheduled occurrence over the next N weeks (default: 8). Each generated event gets:
+**Venue**
+- Enter the venue name, street address, city, state, and ZIP. If a venue with that exact name already exists in The Events Calendar, it will be reused automatically.
 
-- A title like "BINGO Night — Tuesday, April 15, 2025"
-- Proper start/end times and timezone from the program
-- A linked TEC Venue and Organizer (created automatically if they don't exist yet)
-- Custom meta (`_shelter_program_slug`, `_shelter_program_post_id`, capacity, contact info)
-- Assignment to the `shelter_program_cat` taxonomy
-- Tags and featured status from the program config
+**Organizer**
+- Enter the organizer's name, phone, email, and website. Like venues, existing organizers are reused by name.
 
-Duplicate prevention uses a deterministic SHA-256 hash (`program-slug + date`) stored as post meta — re-running generation is always safe and idempotent.
+**Event Links**
+- **Website / Booking URL** — This is written to each generated event's "Event Website" field in The Events Calendar. Visitors see it as a link on the event detail page. Use it for booking pages like SuperSaaS, Eventbrite, or a registration form.
+- **Facebook Page URL** — Stored as metadata on each event. Useful for linking to a Facebook group or event page for the program.
 
-### Adding a New Program
+**Pricing & Logistics**
+- Set the cost (enter 0 for free events), capacity, age restriction, contact email, and whether appointments are required.
 
-1. Go to **Events → All Programs → Add New Program**.
-2. Enter the program name and description in the editor.
-3. In the **Event Schedule Settings** panel below, click the days it runs, set the times, fill in venue and pricing details.
-4. Make sure the **Active** checkbox is checked.
-5. Publish the program.
-6. Go to **Events → Generate Events** and click **Generate Now**, or wait for the daily cron.
+**Event Display**
+- Enter comma-separated tags (e.g. `bingo, fundraiser, community`) that will be applied to each generated event.
+- Check **Featured** to mark generated events as featured in The Events Calendar.
 
-No JSON editing, no code changes, no deploys.
+**Active Toggle**
+- The green/amber banner at the top controls whether the daily cron generates events for this program. Uncheck **Active** to pause a program without deleting it.
 
-### Seed Data and Migration
+4. Click **Publish** (or **Update** if editing).
 
-On first activation, `config/events.json` is imported into CPT posts via the `Program_Importer`. This is a one-time operation — after import, the JSON file is seed data only and the CPT is the live source of truth. The generation settings (lookahead weeks, dedup meta key) still come from JSON since they're infrastructure config rather than content.
+### Generating Events
 
-## Architecture
+Events are generated automatically once per day by WP-Cron, covering the next 8 weeks by default. To generate events immediately:
+
+1. Go to **Events → Generate Events**.
+2. Select a specific program or leave it on "All Active Programs."
+3. Set how many weeks ahead to generate.
+4. Optionally check **Dry run** to preview without creating events.
+5. Click **Generate Now**.
+
+Events that already exist (based on program + date) are skipped automatically — you can run generation as many times as you like without creating duplicates.
+
+### Updating a Program
+
+When you update a program and click **Update**, all **future** events linked to that program are automatically updated to reflect the changes. This includes the event title, description, times, venue, organizer, cost, website URL, tags, and all other fields.
+
+**Past events** are left untouched by default (they're historical records). If you need to update past events too — for example, to correct a contact email — check the **"Also update past events when saving changes"** checkbox in the status banner before saving. This checkbox resets each time, so you have to consciously opt in each time you want past events modified.
+
+After saving, a green notice will tell you how many events were updated (e.g. "12 existing events were updated to match this program.").
+
+### Cancelling a Single Event
+
+If a specific event instance needs to be cancelled (e.g. BINGO is cancelled for one Tuesday due to weather):
+
+1. Find the event in **Events → Events**.
+2. The event's title will be prefixed with `[CANCELLED]` and a cancellation badge will appear in the event list block.
+
+Note: Cancelling a single event does not affect the program or other event instances.
+
+### Pausing a Program
+
+To temporarily stop generating events for a program (e.g. during a seasonal break):
+
+1. Go to **Events → All Programs** and edit the program.
+2. Uncheck the **Active** checkbox in the status banner.
+3. Click **Update**.
+
+No new events will be generated until you re-check Active. Existing future events remain on the calendar unless you delete them manually.
+
+### Getting Help
+
+Go to **Events → Help** to view this guide directly in the WordPress dashboard.
+
+---
+
+## Developer Guide
+
+### Architecture
 
 ```
 config/              → Seed data (programs, venues, organizers) + generation settings
-includes/core/       → Config loader, Program CPT, Taxonomy registry, Event generator, Importer
+includes/core/       → Config loader, Program CPT, Taxonomy registry, Event generator,
+                       Event syncer, Program importer
 includes/abilities/  → WP 6.9 Abilities API callbacks
-includes/            → Admin page, Blocks, REST routes
+includes/            → Admin page, Help page, Blocks, REST routes
 blocks/              → Server-rendered Gutenberg block
 templates/           → Block theme templates
 assets/              → Editor JS, front-end CSS, admin CSS, metabox CSS
 .github/workflows/   → CI linting
 ```
 
-Business logic lives in **abilities** and the **Event Generator** — thin, testable operations with JSON Schema validation. The admin UI, REST endpoints, and blocks are thin consumers that delegate to these. The `Program_CPT` class provides `get_active_programs()` which returns a normalized array that the generator, abilities, REST, and admin page all consume.
+Business logic lives in **abilities**, the **Event Generator**, and the **Event Syncer** — thin, testable operations. The admin UI, REST endpoints, and blocks are thin consumers that delegate to these. The `Program_CPT` class provides `get_active_programs()` which returns a normalized array that the generator, syncer, abilities, REST, and admin page all consume.
 
-## REST API
+### How Event Generation Works
+
+The generator queries all published, active `shelter_program` posts via `Program_CPT::get_active_programs()`, walks each program's recurrence days over the lookahead period, and calls `tribe_events()->set_args()->create()` for each date. Duplicate prevention uses a deterministic SHA-256 hash (`program-slug + date`) stored as `_shelter_generated_hash` post meta.
+
+Each generated event receives:
+- A title like "BINGO Night — Tuesday, April 15, 2025"
+- TEC event meta: start/end times, timezone, cost, currency, Event Website URL (`_EventURL`)
+- Linked TEC Venue and Organizer posts (found by exact title match or created with `publish` status)
+- Custom meta: `_shelter_program_slug`, `_shelter_program_post_id`, `_shelter_facebook_url`, capacity, contact info
+- Taxonomy term from `shelter_program_cat`
+- Tags and featured status
+
+### How Event Sync Works
+
+`Event_Syncer` hooks into `save_post_shelter_program` at priority 20 (after `save_meta` at priority 10). It queries all TEC events with a matching `_shelter_program_post_id`, then updates each event's title, description, times, venue, organizer, cost, URLs, tags, featured status, and custom meta. Future events are always updated; past events are updated only if the `shelter_sync_include_past` checkbox was checked.
+
+Venue and organizer resolution uses `$wpdb` exact title queries against `wp_posts` (not `get_posts()` which doesn't support title filtering) to find existing entries. If a draft is found, it's promoted to `publish`. New entries are created with `'status' => 'publish'`.
+
+### Seed Data and Migration
+
+On first activation, `config/events.json` is imported into CPT posts via `Program_Importer`. This is a one-time operation guarded by an option flag (`shelter_events_programs_imported`). After import, the JSON file is seed data only and the CPT is the live source of truth. The generation settings (lookahead weeks, dedup meta key) still come from JSON since they're infrastructure config.
+
+### REST API
 
 | Endpoint | Method | Auth | Description |
 |---|---|---|---|
@@ -84,16 +150,15 @@ Business logic lives in **abilities** and the **Event Generator** — thin, test
 | `/shelter-events/v1/generate` | POST | Admin | Trigger event generation |
 | `/shelter-events/v1/cancel` | POST | Editor | Cancel a specific event instance |
 
-## Gutenberg Block
+### Gutenberg Block
 
-The **Shelter Event List** block (`shelter-events/event-list`) can be placed on any page or post. It supports:
-
-- Filtering by program (populated from CPT via the REST API)
+The **Shelter Event List** block (`shelter-events/event-list`) can be placed on any page or post:
+- Filter by program (populated from CPT via REST API)
 - Three layouts: list, card grid, compact
-- Toggling cost and venue display
+- Toggle cost and venue display
 - Server-side rendering (no JS on the front end)
 
-## Local Development
+### Local Development
 
 ```bash
 npm install
@@ -102,7 +167,7 @@ npm start          # Starts wp-env with TEC pre-installed
 npm run stop
 ```
 
-## Linting
+### Linting
 
 ```bash
 composer lint       # PHPCS
@@ -111,28 +176,34 @@ npm run lint:js     # JS lint
 npm run lint:css    # CSS lint
 ```
 
-## Hooks & Filters
+### Hooks & Filters
 
 | Hook | Type | Description |
 |---|---|---|
 | `shelter_events_event_created` | Action | Fires after each event instance is generated. Receives `$event_id`, `$slug`, `$program`, `$date`. |
+| `shelter_events_event_synced` | Action | Fires after an existing event is synced with updated program data. Receives `$event_id`, `$program_post_id`, `$program`. |
 | `shelter_events_program_imported` | Action | Fires after a program is imported from JSON seed data. Receives `$post_id`, `$slug`, `$program`. |
 
-## Changelog
+### Changelog
 
-### 2.0.0
+#### 2.1.0
+- **Event sync on program save** — all future events are auto-updated when a program changes. Staff can opt in to updating past events per-save.
+- **Event Links** — programs now have Website/Booking URL and Facebook URL fields. The website URL is written to TEC's native `_EventURL` (Event Website) field on each generated event.
+- **Help page** — `Events → Help` renders the README as a staff guide directly in the dashboard.
+- **Venue/Organizer dedup fix** — resolved duplicate creation caused by `get_posts()` not supporting title queries; now uses `$wpdb` exact title match.
+- **Venue/Organizer publish status** — new entries are created as `publish`; existing drafts are auto-promoted.
+- **AJAX 502 fix** — block registration and admin class are skipped during AJAX requests; `plugins_loaded` priority bumped to 20.
+- Added `shelter_events_event_synced` action hook.
 
+#### 2.0.0
 - **Programs are now a custom post type** (`shelter_program`) managed in the WordPress admin.
-- Added a dedicated "Event Schedule Settings" metabox below the editor with day-of-week chip selectors, venue/organizer fields, pricing, and an active/paused toggle.
-- Added `Program_Importer` to auto-import JSON seed data into CPT posts on first activation.
-- Added custom admin columns (days, time, cost, active status) to the programs list table.
-- Renamed taxonomy from `shelter_program` to `shelter_program_cat` to avoid slug collision with the CPT.
-- Event Generator, Abilities Provider, REST API, and Admin page now read from the CPT instead of JSON config.
-- Generated events store a `_shelter_program_post_id` meta field linking back to the parent program.
+- Added dedicated "Event Schedule Settings" metabox with day-of-week chip selectors, venue/organizer fields, pricing, and active/paused toggle.
+- Added `Program_Importer` for one-time JSON → CPT migration on activation.
+- Added custom admin columns (days, time, cost, active status).
+- Renamed taxonomy to `shelter_program_cat`.
 - Added `shelter_events_program_imported` action hook.
 
-### 1.0.0
-
+#### 1.0.0
 - Initial release with JSON config-driven programs, TEC ORM event generation, WP-Cron scheduling, REST API, Gutenberg block, and WP 6.9 Abilities API support.
 
 ## License
