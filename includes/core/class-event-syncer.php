@@ -183,6 +183,11 @@ final class Event_Syncer {
 	 * @return bool True on success.
 	 */
 	private static function update_single_event( int $event_id, array $program ): bool {
+		// Skip events that have been replaced — they are frozen in their cancelled state.
+		if ( get_post_meta( $event_id, '_shelter_replaced_by', true ) ) {
+			return false;
+		}
+
 		$rec = $program['recurrence'];
 
 		// Preserve the event's existing date, but update the time portion.

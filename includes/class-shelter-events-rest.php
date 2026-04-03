@@ -48,6 +48,15 @@ class Shelter_Events_REST {
 				'reason'   => [ 'type' => 'string' ],
 			],
 		] );
+
+		register_rest_route( self::NAMESPACE, '/replace', [
+			'methods'             => 'POST',
+			'callback'            => [ __CLASS__, 'replace_event' ],
+			'permission_callback' => fn() => current_user_can( 'edit_others_posts' ),
+			'args'                => [
+				'event_id' => [ 'type' => 'integer', 'required' => true ],
+			],
+		] );
 	}
 
 	public static function get_programs( \WP_REST_Request $request ): \WP_REST_Response {
@@ -81,6 +90,12 @@ class Shelter_Events_REST {
 		}
 
 		$events = $query->all();
+
+		// Hide cancelled events that have been replaced.
+		$events = array_filter( $events, function ( $event ) {
+			return ! get_post_meta( $event->ID, '_shelter_replaced_by', true );
+		} );
+
 		$output = [];
 
 		foreach ( $events as $event ) {
@@ -117,5 +132,13 @@ class Shelter_Events_REST {
 		] );
 
 		return new \WP_REST_Response( $result, $result['success'] ? 200 : 404 );
+	}
+
+	public static function replace_event( \WP_REST_Request $request ): \WP_REST_Response {
+		$result = \Shelter_Events\Abilities\Provider::handle_shelter_replace_event( [
+			'event_id' => $request->get_param( 'event_id' ),
+		] );
+
+		return new \WP_REST_Response( $result, $result['success'] ? 200 : 400 );
 	}
 }

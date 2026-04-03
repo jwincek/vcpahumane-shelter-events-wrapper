@@ -31,3 +31,38 @@
 .shelter-events-admin .form-table th {
 	width: 160px;
 }
+
+/* Replace action link in row actions (TEC events list + generate page) */
+.shelter-replace-action {
+	color: #d63638;
+}
+.shelter-replace-action:hover {
+	color: #a00;
+}
+
+/* Status badges in upcoming events table */
+.shelter-status {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.5;
+}
+.shelter-status--active {
+	background: #edfaef;
+	color: #1e7e34;
+}
+.shelter-status--cancelled {
+	background: #fce8e8;
+	color: #d63638;
+}
+.shelter-status--replaced {
+	background: #fff8e5;
+	color: #996800;
+}
+
+/* Upcoming events table */
+.shelter-upcoming-events .shelter-event-actions a {
+	margin-right: 8px;
+}

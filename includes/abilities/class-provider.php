@@ -113,6 +113,85 @@ final class Provider {
 		];
 	}
 
+	/**
+	 * Handle: shelter_replace_event
+	 *
+	 * Cancels a generated event and creates a draft replacement pre-populated
+	 * with the original's date, time, venue, and organizer. The replacement
+	 * is not linked to the program, so the syncer will not overwrite it.
+	 */
+	public static function handle_shelter_replace_event( array $args ): array {
+		$event_id = (int) $args['event_id'];
+		$post     = get_post( $event_id );
+
+		if ( ! $post || $post->post_type !== 'tribe_events' ) {
+			return [ 'success' => false, 'error' => 'Event not found.' ];
+		}
+
+		if ( get_post_meta( $event_id, '_shelter_replaced_by', true ) ) {
+			return [ 'success' => false, 'error' => 'Event has already been replaced.' ];
+		}
+
+		if ( get_post_meta( $event_id, '_shelter_cancelled', true ) ) {
+			return [ 'success' => false, 'error' => 'Event is already cancelled.' ];
+		}
+
+		// Read the original event's scheduling data.
+		$start_date      = get_post_meta( $event_id, '_EventStartDate', true );
+		$end_date        = get_post_meta( $event_id, '_EventEndDate', true );
+		$timezone        = get_post_meta( $event_id, '_EventTimezone', true ) ?: wp_timezone_string();
+		$venue_id        = (int) get_post_meta( $event_id, '_EventVenueID', true );
+		$organizer_id    = (int) get_post_meta( $event_id, '_EventOrganizerID', true );
+		$cost            = get_post_meta( $event_id, '_EventCost', true );
+		$currency_symbol = get_post_meta( $event_id, '_EventCurrencySymbol', true ) ?: '$';
+
+		// Cancel the original event.
+		update_post_meta( $event_id, '_shelter_cancelled', '1' );
+		update_post_meta( $event_id, '_shelter_cancel_reason', 'Replaced by a special event.' );
+
+		$original_title = $post->post_title;
+		if ( strpos( $original_title, '[CANCELLED]' ) !== 0 ) {
+			wp_update_post( [
+				'ID'         => $event_id,
+				'post_title' => '[CANCELLED] ' . $original_title,
+			] );
+		}
+
+		// Create the replacement event as a draft via TEC ORM.
+		$replacement_args = [
+			'title'           => $original_title,
+			'status'          => 'draft',
+			'start_date'      => $start_date,
+			'end_date'        => $end_date,
+			'timezone'        => $timezone,
+			'cost'            => $cost,
+			'currency_symbol' => $currency_symbol,
+		];
+
+		if ( $venue_id ) {
+			$replacement_args['venue'] = $venue_id;
+		}
+		if ( $organizer_id ) {
+			$replacement_args['organizer'] = $organizer_id;
+		}
+
+		$replacement = tribe_events()->set_args( $replacement_args )->create();
+
+		if ( ! $replacement instanceof \WP_Post ) {
+			return [ 'success' => false, 'error' => 'Failed to create replacement event.' ];
+		}
+
+		// Cross-reference the pair.
+		update_post_meta( $event_id, '_shelter_replaced_by', $replacement->ID );
+		update_post_meta( $replacement->ID, '_shelter_replaces_event', $event_id );
+
+		return [
+			'success'              => true,
+			'original_event_id'    => $event_id,
+			'replacement_event_id' => $replacement->ID,
+		];
+	}
+
 	private static function build_permission_callback( string $capability ): callable {
 		return static fn(): bool => current_user_can( $capability );
 	}

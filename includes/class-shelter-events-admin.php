@@ -16,6 +16,8 @@ class Shelter_Events_Admin {
 		add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
 		add_action( 'admin_init', [ $this, 'handle_generate_action' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+		add_action( 'admin_post_shelter_replace_event', [ $this, 'handle_replace_action' ] );
+		add_filter( 'post_row_actions', [ $this, 'add_replace_row_action' ], 10, 2 );
 	}
 
 	public function add_menu_page(): void {
@@ -64,8 +66,84 @@ class Shelter_Events_Admin {
 		exit;
 	}
 
+	/**
+	 * Add a "Replace" row action to shelter-generated events in the TEC events list.
+	 */
+	public function add_replace_row_action( array $actions, \WP_Post $post ): array {
+		if ( $post->post_type !== 'tribe_events' ) {
+			return $actions;
+		}
+
+		if ( ! current_user_can( 'edit_others_posts' ) ) {
+			return $actions;
+		}
+
+		// Only for shelter-generated events.
+		if ( ! get_post_meta( $post->ID, '_shelter_program_slug', true ) ) {
+			return $actions;
+		}
+
+		// Already replaced or cancelled.
+		if ( get_post_meta( $post->ID, '_shelter_replaced_by', true )
+			|| get_post_meta( $post->ID, '_shelter_cancelled', true ) ) {
+			return $actions;
+		}
+
+		// Only future events.
+		$start = get_post_meta( $post->ID, '_EventStartDate', true );
+		if ( $start && strtotime( $start ) < time() ) {
+			return $actions;
+		}
+
+		$url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=shelter_replace_event&event_id=' . $post->ID ),
+			'shelter_replace_event_' . $post->ID
+		);
+
+		$actions['shelter_replace'] = sprintf(
+			'<a href="%s" class="shelter-replace-action">%s</a>',
+			esc_url( $url ),
+			esc_html__( 'Replace', 'shelter-events' )
+		);
+
+		return $actions;
+	}
+
+	/**
+	 * Handle the "Replace" admin-post action — cancels the original, creates
+	 * a draft replacement, and redirects to the TEC block editor.
+	 */
+	public function handle_replace_action(): void {
+		$event_id = (int) ( $_GET['event_id'] ?? 0 );
+
+		if ( ! $event_id
+			|| ! wp_verify_nonce( $_GET['_wpnonce'] ?? '', 'shelter_replace_event_' . $event_id ) ) {
+			wp_die( __( 'Security check failed.', 'shelter-events' ) );
+		}
+
+		if ( ! current_user_can( 'edit_others_posts' ) ) {
+			wp_die( __( 'Insufficient permissions.', 'shelter-events' ) );
+		}
+
+		$result = \Shelter_Events\Abilities\Provider::handle_shelter_replace_event( [
+			'event_id' => $event_id,
+		] );
+
+		if ( ! $result['success'] ) {
+			wp_die( $result['error'] ?? __( 'Replace failed.', 'shelter-events' ) );
+		}
+
+		// Redirect to the block editor for the new replacement event.
+		wp_safe_redirect( admin_url( 'post.php?post=' . $result['replacement_event_id'] . '&action=edit' ) );
+		exit;
+	}
+
 	public function enqueue_admin_assets( string $hook ): void {
-		if ( ! str_contains( $hook, 'shelter-events-generate' ) ) {
+		$is_generate_page = str_contains( $hook, 'shelter-events-generate' );
+		$is_events_list   = $hook === 'edit.php'
+			&& ( get_current_screen()->post_type ?? '' ) === 'tribe_events';
+
+		if ( ! $is_generate_page && ! $is_events_list ) {
 			return;
 		}
 
@@ -171,6 +249,98 @@ class Shelter_Events_Admin {
 					</table>
 				<?php endif; ?>
 			</div>
+
+			<!-- Upcoming Generated Events -->
+			<?php if ( function_exists( 'tribe_events' ) && current_user_can( 'edit_others_posts' ) ) :
+				$upcoming = get_posts( [
+					'post_type'   => 'tribe_events',
+					'post_status' => 'any',
+					'numberposts' => 20,
+					'orderby'     => 'meta_value',
+					'meta_key'    => '_EventStartDate',
+					'order'       => 'ASC',
+					'meta_query'  => [
+						'relation' => 'AND',
+						[
+							'key'     => '_shelter_program_slug',
+							'compare' => 'EXISTS',
+						],
+						[
+							'key'     => '_EventStartDate',
+							'value'   => current_time( 'Y-m-d 00:00:00' ),
+							'compare' => '>=',
+							'type'    => 'DATETIME',
+						],
+					],
+				] );
+			?>
+				<?php if ( ! empty( $upcoming ) ) : ?>
+					<div class="shelter-card">
+						<h2><?php esc_html_e( 'Upcoming Generated Events', 'shelter-events' ); ?></h2>
+						<table class="wp-list-table widefat fixed striped shelter-upcoming-events">
+							<thead>
+								<tr>
+									<th><?php esc_html_e( 'Event', 'shelter-events' ); ?></th>
+									<th><?php esc_html_e( 'Program', 'shelter-events' ); ?></th>
+									<th><?php esc_html_e( 'Date', 'shelter-events' ); ?></th>
+									<th><?php esc_html_e( 'Status', 'shelter-events' ); ?></th>
+									<th><?php esc_html_e( 'Actions', 'shelter-events' ); ?></th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php foreach ( $upcoming as $event ) :
+									$event_start   = get_post_meta( $event->ID, '_EventStartDate', true );
+									$programme     = get_post_meta( $event->ID, '_shelter_program_slug', true );
+									$cancelled     = (bool) get_post_meta( $event->ID, '_shelter_cancelled', true );
+									$replaced_by   = (int) get_post_meta( $event->ID, '_shelter_replaced_by', true );
+									$start_dt      = new DateTime( $event_start );
+								?>
+									<tr>
+										<td><strong><?php echo esc_html( $event->post_title ); ?></strong></td>
+										<td><?php echo esc_html( $programme ); ?></td>
+										<td><?php echo esc_html( $start_dt->format( 'D, M j, Y — g:i A' ) ); ?></td>
+										<td>
+											<?php if ( $replaced_by ) : ?>
+												<span class="shelter-status shelter-status--replaced">
+													<?php esc_html_e( 'Replaced', 'shelter-events' ); ?>
+												</span>
+											<?php elseif ( $cancelled ) : ?>
+												<span class="shelter-status shelter-status--cancelled">
+													<?php esc_html_e( 'Cancelled', 'shelter-events' ); ?>
+												</span>
+											<?php else : ?>
+												<span class="shelter-status shelter-status--active">
+													<?php esc_html_e( 'Active', 'shelter-events' ); ?>
+												</span>
+											<?php endif; ?>
+										</td>
+										<td class="shelter-event-actions">
+											<?php if ( $replaced_by ) : ?>
+												<a href="<?php echo esc_url( get_edit_post_link( $replaced_by ) ); ?>">
+													<?php esc_html_e( 'Edit Replacement', 'shelter-events' ); ?>
+												</a>
+											<?php elseif ( ! $cancelled ) : ?>
+												<?php
+												$replace_url = wp_nonce_url(
+													admin_url( 'admin-post.php?action=shelter_replace_event&event_id=' . $event->ID ),
+													'shelter_replace_event_' . $event->ID
+												);
+												?>
+												<a href="<?php echo esc_url( $replace_url ); ?>" class="shelter-replace-action">
+													<?php esc_html_e( 'Replace', 'shelter-events' ); ?>
+												</a>
+												<a href="<?php echo esc_url( get_edit_post_link( $event->ID ) ); ?>">
+													<?php esc_html_e( 'Edit', 'shelter-events' ); ?>
+												</a>
+											<?php endif; ?>
+										</td>
+									</tr>
+								<?php endforeach; ?>
+							</tbody>
+						</table>
+					</div>
+				<?php endif; ?>
+			<?php endif; ?>
 
 			<!-- Generate Form -->
 			<div class="shelter-card">

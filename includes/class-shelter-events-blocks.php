@@ -76,6 +76,12 @@ class Shelter_Events_Blocks {
 
 		$events = $query->all();
 
+		// Hide cancelled events that have been replaced — the replacement
+		// event occupies the same calendar slot and will appear on its own.
+		$events = array_filter( $events, function ( $event ) {
+			return ! get_post_meta( $event->ID, '_shelter_replaced_by', true );
+		} );
+
 		if ( empty( $events ) ) {
 			return '<p class="shelter-events-empty">' .
 				esc_html__( 'No upcoming events scheduled.', 'shelter-events' ) .

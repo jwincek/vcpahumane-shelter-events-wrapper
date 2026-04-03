@@ -61,6 +61,22 @@
 					}
 				}
 			}
+		},
+		"shelter_replace_event": {
+			"label": "Replace Event Instance",
+			"description": "Cancel a generated event and create a replacement that opens in the block editor.",
+			"category": "shelter-events",
+			"permission_callback": "edit_others_posts",
+			"schema": {
+				"type": "object",
+				"required": [ "event_id" ],
+				"properties": {
+					"event_id": {
+						"type": "integer",
+						"description": "Post ID of the TEC event to replace."
+					}
+				}
+			}
 		}
 	}
 }
