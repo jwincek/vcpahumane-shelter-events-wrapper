@@ -125,7 +125,16 @@ function shelter_events_init(): void {
 	// 8. REST routes.
 	add_action( 'rest_api_init', [ 'Shelter_Events_REST', 'register_routes' ] );
 
-	// 9. Front-end assets.
+	// 9. Override TEC cost display for variable-pricing events.
+	add_filter( 'tribe_get_cost', function ( string $cost, ?int $post_id ) {
+		if ( ! $post_id ) {
+			return $cost;
+		}
+		$variable = get_post_meta( $post_id, '_shelter_variable_pricing', true );
+		return ( $variable === 'yes' ) ? __( 'Varies', 'shelter-events' ) : $cost;
+	}, 10, 2 );
+
+	// 10. Front-end assets.
 	add_action( 'wp_enqueue_scripts', function (): void {
 		if ( is_post_type_archive( 'tribe_events' ) || is_singular( 'tribe_events' ) ) {
 			wp_enqueue_style(

@@ -97,6 +97,11 @@ final class Program_CPT {
 			'default' => '0',
 			'label'   => 'Cost',
 		],
+		'variable_pricing' => [
+			'type'    => 'string',
+			'default' => 'no',
+			'label'   => 'Variable pricing',
+		],
 		'currency_symbol' => [
 			'type'    => 'string',
 			'default' => '$',
@@ -141,6 +146,11 @@ final class Program_CPT {
 			'type'    => 'string',
 			'default' => 'no',
 			'label'   => 'Featured event',
+		],
+		'blackout_dates' => [
+			'type'    => 'string',
+			'default' => '',
+			'label'   => 'Blackout dates',
 		],
 		'active' => [
 			'type'    => 'string',
@@ -334,6 +344,17 @@ final class Program_CPT {
 						<?php endforeach; ?>
 					</select>
 				</div>
+
+				<div class="shelter-metabox__field">
+					<label for="shelter_prog_blackout_dates"><?php esc_html_e( 'Blackout dates', 'shelter-events' ); ?></label>
+					<textarea id="shelter_prog_blackout_dates" name="shelter_prog_blackout_dates"
+						class="widefat" rows="3"
+						placeholder="<?php esc_attr_e( 'One date per line: 2026-12-25', 'shelter-events' ); ?>"
+					><?php echo esc_textarea( $meta['blackout_dates'] ); ?></textarea>
+					<span class="description">
+						<?php esc_html_e( 'Dates when this program should not generate events (YYYY-MM-DD, one per line). These are checked in addition to the global blackout dates.', 'shelter-events' ); ?>
+					</span>
+				</div>
 			</fieldset>
 
 			<!-- Section: Venue -->
@@ -414,11 +435,21 @@ final class Program_CPT {
 							placeholder="<?php esc_attr_e( '0 = Free', 'shelter-events' ); ?>" />
 					</div>
 					<div class="shelter-metabox__field shelter-metabox__field--quarter">
+						<label>
+							<input type="checkbox" name="shelter_prog_variable_pricing" value="yes"
+								<?php checked( $meta['variable_pricing'], 'yes' ); ?> />
+							<?php esc_html_e( 'Variable pricing', 'shelter-events' ); ?>
+						</label>
+						<span class="description"><?php esc_html_e( 'Displays "Varies" instead of a fixed cost.', 'shelter-events' ); ?></span>
+					</div>
+					<div class="shelter-metabox__field shelter-metabox__field--quarter">
 						<label for="shelter_prog_capacity"><?php esc_html_e( 'Capacity', 'shelter-events' ); ?></label>
 						<input type="text" id="shelter_prog_capacity" name="shelter_prog_capacity"
 							value="<?php echo esc_attr( $meta['capacity'] ); ?>"
 							placeholder="<?php esc_attr_e( 'e.g. 120', 'shelter-events' ); ?>" />
 					</div>
+				</div>
+				<div class="shelter-metabox__row">
 					<div class="shelter-metabox__field shelter-metabox__field--quarter">
 						<label for="shelter_prog_age_restriction"><?php esc_html_e( 'Age restriction', 'shelter-events' ); ?></label>
 						<input type="text" id="shelter_prog_age_restriction" name="shelter_prog_age_restriction"
@@ -512,7 +543,7 @@ final class Program_CPT {
 		update_post_meta( $post_id, self::META_PREFIX . 'recurrence_days', $days );
 
 		// Checkbox fields (value="yes" if checked, "no" if not).
-		$checkbox_fields = [ 'active', 'requires_appointment', 'featured' ];
+		$checkbox_fields = [ 'active', 'requires_appointment', 'featured', 'variable_pricing' ];
 		foreach ( $checkbox_fields as $field ) {
 			$value = isset( $_POST[ 'shelter_prog_' . $field ] ) ? 'yes' : 'no';
 			update_post_meta( $post_id, self::META_PREFIX . $field, $value );
@@ -533,6 +564,44 @@ final class Program_CPT {
 			$value = isset( $_POST[ $key ] ) ? sanitize_text_field( $_POST[ $key ] ) : '';
 			update_post_meta( $post_id, self::META_PREFIX . $field, $value );
 		}
+
+		// Blackout dates — textarea, sanitized to preserve newlines and validate format.
+		$raw_dates   = isset( $_POST['shelter_prog_blackout_dates'] )
+			? sanitize_textarea_field( $_POST['shelter_prog_blackout_dates'] )
+			: '';
+		$valid_dates = self::parse_blackout_dates( $raw_dates );
+		update_post_meta( $post_id, self::META_PREFIX . 'blackout_dates', implode( "\n", $valid_dates ) );
+	}
+
+	/**
+	 * Parse a newline-separated string of dates into an array of valid Y-m-d strings.
+	 *
+	 * @param string $raw Raw textarea value.
+	 * @return string[] Valid date strings.
+	 */
+	public static function parse_blackout_dates( string $raw ): array {
+		if ( trim( $raw ) === '' ) {
+			return [];
+		}
+
+		$lines = preg_split( '/[\r\n,]+/', $raw );
+		$dates = [];
+
+		foreach ( $lines as $line ) {
+			$line = trim( $line );
+			if ( $line === '' ) {
+				continue;
+			}
+			// Accept YYYY-MM-DD format only.
+			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $line ) ) {
+				$dt = \DateTime::createFromFormat( 'Y-m-d', $line );
+				if ( $dt && $dt->format( 'Y-m-d' ) === $line ) {
+					$dates[] = $line;
+				}
+			}
+		}
+
+		return array_unique( $dates );
 	}
 
 	// ── Admin Columns ─────────────────────────────────────────────────────────
@@ -573,12 +642,16 @@ final class Program_CPT {
 				break;
 
 			case 'shelter_cost':
-				$cost = $meta['cost'];
-				echo esc_html(
-					( $cost === '0' || $cost === '' )
-						? __( 'Free', 'shelter-events' )
-						: $meta['currency_symbol'] . $cost
-				);
+				if ( $meta['variable_pricing'] === 'yes' ) {
+					echo esc_html__( 'Varies', 'shelter-events' );
+				} else {
+					$cost = $meta['cost'];
+					echo esc_html(
+						( $cost === '0' || $cost === '' )
+							? __( 'Free', 'shelter-events' )
+							: $meta['currency_symbol'] . $cost
+					);
+				}
 				break;
 
 			case 'shelter_active':
@@ -667,12 +740,14 @@ final class Program_CPT {
 				'tags'            => array_filter( array_map( 'trim', explode( ',', $meta['tags'] ) ) ),
 				'website_url'     => $meta['website_url'],
 				'facebook_url'    => $meta['facebook_url'],
+				'blackout_dates'  => self::parse_blackout_dates( $meta['blackout_dates'] ),
 				'meta'            => [
 					'_shelter_program'              => $post->post_name,
 					'_shelter_capacity'             => $meta['capacity'],
 					'_shelter_contact_email'        => $meta['contact_email'],
 					'_shelter_requires_appointment' => $meta['requires_appointment'],
 					'_shelter_age_restriction'      => $meta['age_restriction'],
+					'_shelter_variable_pricing'     => $meta['variable_pricing'],
 				],
 			];
 

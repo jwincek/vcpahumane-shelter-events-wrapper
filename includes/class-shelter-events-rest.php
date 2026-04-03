@@ -99,16 +99,19 @@ class Shelter_Events_REST {
 		$output = [];
 
 		foreach ( $events as $event ) {
+			$variable = get_post_meta( $event->ID, '_shelter_variable_pricing', true );
+
 			$output[] = [
-				'id'         => $event->ID,
-				'title'      => get_the_title( $event ),
-				'start_date' => get_post_meta( $event->ID, '_EventStartDate', true ),
-				'end_date'   => get_post_meta( $event->ID, '_EventEndDate', true ),
-				'url'        => get_permalink( $event ),
-				'programme'  => get_post_meta( $event->ID, '_shelter_program_slug', true ),
-				'cancelled'  => (bool) get_post_meta( $event->ID, '_shelter_cancelled', true ),
-				'venue'      => tribe_get_venue( $event->ID ),
-				'cost'       => tribe_get_cost( $event->ID, true ),
+				'id'               => $event->ID,
+				'title'            => get_the_title( $event ),
+				'start_date'       => get_post_meta( $event->ID, '_EventStartDate', true ),
+				'end_date'         => get_post_meta( $event->ID, '_EventEndDate', true ),
+				'url'              => get_permalink( $event ),
+				'programme'        => get_post_meta( $event->ID, '_shelter_program_slug', true ),
+				'cancelled'        => (bool) get_post_meta( $event->ID, '_shelter_cancelled', true ),
+				'venue'            => tribe_get_venue( $event->ID ),
+				'cost'             => ( $variable === 'yes' ) ? __( 'Varies', 'shelter-events' ) : tribe_get_cost( $event->ID, true ),
+				'variable_pricing' => ( $variable === 'yes' ),
 			];
 		}
 

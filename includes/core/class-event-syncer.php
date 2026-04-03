@@ -117,6 +117,7 @@ final class Event_Syncer {
 				'_shelter_contact_email'        => $meta['contact_email'],
 				'_shelter_requires_appointment' => $meta['requires_appointment'],
 				'_shelter_age_restriction'      => $meta['age_restriction'],
+				'_shelter_variable_pricing'     => $meta['variable_pricing'],
 			],
 		];
 	}

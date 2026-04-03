@@ -12,9 +12,13 @@ declare( strict_types=1 );
 
 class Shelter_Events_Admin {
 
+	/** @var string Option key for global blackout dates. */
+	public const BLACKOUT_OPTION = 'shelter_events_blackout_dates';
+
 	public function __construct() {
 		add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
 		add_action( 'admin_init', [ $this, 'handle_generate_action' ] );
+		add_action( 'admin_init', [ $this, 'handle_blackout_save' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 		add_action( 'admin_post_shelter_replace_event', [ $this, 'handle_replace_action' ] );
 		add_filter( 'post_row_actions', [ $this, 'add_replace_row_action' ], 10, 2 );
@@ -64,6 +68,43 @@ class Shelter_Events_Admin {
 			'dry_run'   => $dry_run ? '1' : '0',
 		], admin_url( 'edit.php?post_type=tribe_events' ) ) );
 		exit;
+	}
+
+	/**
+	 * Save global blackout dates from the Generate Events page.
+	 */
+	public function handle_blackout_save(): void {
+		if ( ! isset( $_POST['shelter_blackout_nonce'] ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( $_POST['shelter_blackout_nonce'], 'shelter_save_blackout_dates' ) ) {
+			wp_die( __( 'Security check failed.', 'shelter-events' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( __( 'Insufficient permissions.', 'shelter-events' ) );
+		}
+
+		$raw   = sanitize_textarea_field( $_POST['shelter_blackout_dates'] ?? '' );
+		$dates = \Shelter_Events\Core\Program_CPT::parse_blackout_dates( $raw );
+
+		update_option( self::BLACKOUT_OPTION, $dates );
+
+		wp_safe_redirect( add_query_arg( [
+			'page'             => 'shelter-events-generate',
+			'blackout_updated' => '1',
+		], admin_url( 'edit.php?post_type=tribe_events' ) ) );
+		exit;
+	}
+
+	/**
+	 * Get the global blackout dates as an array of Y-m-d strings.
+	 *
+	 * @return string[]
+	 */
+	public static function get_global_blackout_dates(): array {
+		return get_option( self::BLACKOUT_OPTION, [] );
 	}
 
 	/**
@@ -162,7 +203,13 @@ class Shelter_Events_Admin {
 		$next_cron = wp_next_scheduled( 'shelter_events_generate_recurring' );
 		?>
 		<div class="wrap shelter-events-admin">
-			<h1><?php esc_html_e( 'Generate Shelter Events', 'shelter-events' ); ?></h1>
+			<h1>
+				<?php esc_html_e( 'Generate Shelter Events', 'shelter-events' ); ?>
+				<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=tribe_events&page=shelter-events-help#staff-guide' ) ); ?>"
+					class="page-title-action">
+					<?php esc_html_e( 'Staff Guide & Help', 'shelter-events' ); ?>
+				</a>
+			</h1>
 
 			<?php if ( isset( $_GET['generated'] ) ) : ?>
 				<div class="notice notice-success is-dismissible">
@@ -175,6 +222,12 @@ class Shelter_Events_Admin {
 						);
 						?>
 					</p>
+				</div>
+			<?php endif; ?>
+
+			<?php if ( isset( $_GET['blackout_updated'] ) ) : ?>
+				<div class="notice notice-success is-dismissible">
+					<p><?php esc_html_e( 'Global blackout dates saved.', 'shelter-events' ); ?></p>
 				</div>
 			<?php endif; ?>
 
@@ -229,12 +282,17 @@ class Shelter_Events_Admin {
 									<td><?php echo esc_html( $prog['recurrence']['start_time'] . ' – ' . $prog['recurrence']['end_time'] ); ?></td>
 									<td>
 										<?php
-										$cost = $prog['cost'];
-										echo esc_html(
-											( $cost === '0' || $cost === '' )
-												? __( 'Free', 'shelter-events' )
-												: ( $prog['currency_symbol'] ?? '$' ) . $cost
-										);
+										$is_variable = ( $prog['meta']['_shelter_variable_pricing'] ?? 'no' ) === 'yes';
+										if ( $is_variable ) :
+											echo esc_html__( 'Varies', 'shelter-events' );
+										else :
+											$cost = $prog['cost'];
+											echo esc_html(
+												( $cost === '0' || $cost === '' )
+													? __( 'Free', 'shelter-events' )
+													: ( $prog['currency_symbol'] ?? '$' ) . $cost
+											);
+										endif;
 										?>
 									</td>
 									<td><?php echo esc_html( $prog['venue']['venue'] ?? '—' ); ?></td>
@@ -252,6 +310,7 @@ class Shelter_Events_Admin {
 
 			<!-- Upcoming Generated Events -->
 			<?php if ( function_exists( 'tribe_events' ) && current_user_can( 'edit_others_posts' ) ) :
+				$global_blackout_set = array_flip( self::get_global_blackout_dates() );
 				$upcoming = get_posts( [
 					'post_type'   => 'tribe_events',
 					'post_status' => 'any',
@@ -294,6 +353,8 @@ class Shelter_Events_Admin {
 									$cancelled     = (bool) get_post_meta( $event->ID, '_shelter_cancelled', true );
 									$replaced_by   = (int) get_post_meta( $event->ID, '_shelter_replaced_by', true );
 									$start_dt      = new DateTime( $event_start );
+									$event_ymd     = $start_dt->format( 'Y-m-d' );
+									$on_blackout   = isset( $global_blackout_set[ $event_ymd ] );
 								?>
 									<tr>
 										<td><strong><?php echo esc_html( $event->post_title ); ?></strong></td>
@@ -307,6 +368,10 @@ class Shelter_Events_Admin {
 											<?php elseif ( $cancelled ) : ?>
 												<span class="shelter-status shelter-status--cancelled">
 													<?php esc_html_e( 'Cancelled', 'shelter-events' ); ?>
+												</span>
+											<?php elseif ( $on_blackout ) : ?>
+												<span class="shelter-status shelter-status--blackout">
+													<?php esc_html_e( 'Blackout', 'shelter-events' ); ?>
 												</span>
 											<?php else : ?>
 												<span class="shelter-status shelter-status--active">
@@ -393,6 +458,55 @@ class Shelter_Events_Admin {
 					</table>
 
 					<?php submit_button( __( 'Generate Now', 'shelter-events' ), 'primary', 'submit', true ); ?>
+				</form>
+			</div>
+
+			<!-- Global Blackout Dates -->
+			<div class="shelter-card">
+				<h2><?php esc_html_e( 'Global Blackout Dates', 'shelter-events' ); ?></h2>
+				<p class="description" style="margin-top:0;">
+					<?php esc_html_e( 'Events will not be generated on these dates for any program. Individual programs can also have their own blackout dates in their settings.', 'shelter-events' ); ?>
+				</p>
+
+				<form method="post">
+					<?php wp_nonce_field( 'shelter_save_blackout_dates', 'shelter_blackout_nonce' ); ?>
+
+					<?php
+					$global_dates = self::get_global_blackout_dates();
+					$dates_text   = ! empty( $global_dates ) ? implode( "\n", $global_dates ) : '';
+					?>
+
+					<div class="shelter-blackout-layout">
+						<div class="shelter-blackout-layout__input">
+							<textarea name="shelter_blackout_dates" rows="8" class="widefat"
+								placeholder="<?php esc_attr_e( "2026-12-25\n2026-11-26\n2026-01-01", 'shelter-events' ); ?>"
+							><?php echo esc_textarea( $dates_text ); ?></textarea>
+							<span class="description">
+								<?php esc_html_e( 'YYYY-MM-DD format, one date per line.', 'shelter-events' ); ?>
+							</span>
+						</div>
+
+						<?php if ( ! empty( $global_dates ) ) : ?>
+							<div class="shelter-blackout-layout__summary">
+								<strong><?php esc_html_e( 'Current blackout dates:', 'shelter-events' ); ?></strong>
+								<ul class="shelter-blackout-list">
+									<?php foreach ( $global_dates as $d ) :
+										$dt = \DateTime::createFromFormat( 'Y-m-d', $d );
+									?>
+										<li>
+											<?php
+											echo $dt
+												? esc_html( $dt->format( 'l, F j, Y' ) )
+												: esc_html( $d );
+											?>
+										</li>
+									<?php endforeach; ?>
+								</ul>
+							</div>
+						<?php endif; ?>
+					</div>
+
+					<?php submit_button( __( 'Save Blackout Dates', 'shelter-events' ), 'secondary', 'submit', true ); ?>
 				</form>
 			</div>
 

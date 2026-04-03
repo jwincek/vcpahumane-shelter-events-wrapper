@@ -24,8 +24,8 @@ class Shelter_Events_Help {
 	public function add_menu_page(): void {
 		add_submenu_page(
 			'edit.php?post_type=tribe_events',
-			__( 'Shelter Events Help', 'shelter-events' ),
-			__( 'Help', 'shelter-events' ),
+			__( 'Shelter Events — Help & Documentation', 'shelter-events' ),
+			__( 'Staff Guide & Help', 'shelter-events' ),
 			'edit_posts',
 			'shelter-events-help',
 			[ $this, 'render_page' ]

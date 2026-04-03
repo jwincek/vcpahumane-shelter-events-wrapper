@@ -46,6 +46,7 @@ This section is written for non-technical shelter staff who manage the event cal
 
 **Pricing & Logistics**
 - Set the cost (enter 0 for free events), capacity, age restriction, contact email, and whether appointments are required.
+- Check **Variable pricing** if the program has multiple price points (e.g. admission + per-card fees). This displays "Varies" instead of a fixed amount on the calendar.
 
 **Event Display**
 - Enter comma-separated tags (e.g. `bingo, fundraiser, community`) that will be applied to each generated event.
@@ -85,6 +86,51 @@ If a specific event instance needs to be cancelled (e.g. BINGO is cancelled for 
 
 Note: Cancelling a single event does not affect the program or other event instances.
 
+### Replacing an Event with a Special Event
+
+When a regular program event needs to be swapped for a one-off (e.g. regular Saturday BINGO is replaced by Novelty BINGO):
+
+1. **From the Events list:** Find the event in **Events → Events**. Hover over it and click the **Replace** link in the row actions.
+2. **From the Generate page:** Go to **Events → Generate Events**, find the event in the **Upcoming Generated Events** table, and click **Replace**.
+
+Either way, the plugin will:
+- Cancel the original event (marked as `[CANCELLED]`).
+- Create a new **draft** replacement event pre-populated with the original's date, time, venue, and organizer.
+- Open the replacement in **The Events Calendar's block editor**, where you can customize the title, description, images, pricing, tickets, and anything else.
+
+Once you're happy with the replacement, click **Publish**. The replacement appears on the calendar in the same time slot. The cancelled original is hidden from visitors automatically.
+
+The **Upcoming Generated Events** table on the Generate page shows the status of each event: Active, Cancelled, Replaced (with a link to edit the replacement), or Blackout.
+
+### Variable Pricing
+
+For programs with multiple price points (e.g. BINGO with admission + per-card fees, or spay/neuter with different packages):
+
+1. Edit the program and check the **Variable pricing** checkbox in the Pricing & Logistics section.
+2. The cost field is kept at 0 — The Events Calendar will display **"Varies"** instead of "Free" on the single event page, calendar views, and the event list block.
+
+This is a display-level flag. When you're ready to add structured pricing (e.g. with Event Tickets), the variable pricing flag can be retired in favor of real ticket types.
+
+### Blackout Dates
+
+Blackout dates prevent events from being generated on specific days (holidays, closures, etc.).
+
+**Global blackout dates** (all programs):
+
+1. Go to **Events → Generate Events** and scroll to the **Global Blackout Dates** section.
+2. Enter dates in `YYYY-MM-DD` format, one per line (e.g. `2026-12-25`).
+3. Click **Save Blackout Dates**.
+
+**Per-program blackout dates:**
+
+1. Edit the program and scroll to the **Blackout dates** textarea in the Schedule section.
+2. Enter dates the same way — one per line, `YYYY-MM-DD` format.
+3. Click **Update**.
+
+Per-program dates are checked *in addition to* global dates. Both lists are merged during generation.
+
+**Important:** Blackout dates only prevent future generation. If events were already generated before a blackout date was added, they will remain on the calendar. You can cancel or replace them manually. The Upcoming Generated Events table flags these with a purple **Blackout** badge so you can spot them easily.
+
 ### Pausing a Program
 
 To temporarily stop generating events for a program (e.g. during a seasonal break):
@@ -121,7 +167,7 @@ Business logic lives in **abilities**, the **Event Generator**, and the **Event 
 
 ### How Event Generation Works
 
-The generator queries all published, active `shelter_program` posts via `Program_CPT::get_active_programs()`, walks each program's recurrence days over the lookahead period, and calls `tribe_events()->set_args()->create()` for each date. Duplicate prevention uses a deterministic SHA-256 hash (`program-slug + date`) stored as `_shelter_generated_hash` post meta.
+The generator queries all published, active `shelter_program` posts via `Program_CPT::get_active_programs()`, walks each program's recurrence days over the lookahead period, and calls `tribe_events()->set_args()->create()` for each date. Duplicate prevention uses a deterministic SHA-256 hash (`program-slug + date`) stored as `_shelter_generated_hash` post meta. Dates that appear in either the global blackout list (`shelter_events_blackout_dates` option) or the program's own `blackout_dates` field are skipped silently.
 
 Each generated event receives:
 - A title like "BINGO Night — Tuesday, April 15, 2025"
@@ -133,7 +179,7 @@ Each generated event receives:
 
 ### How Event Sync Works
 
-`Event_Syncer` hooks into `save_post_shelter_program` at priority 20 (after `save_meta` at priority 10). It queries all TEC events with a matching `_shelter_program_post_id`, then updates each event's title, description, times, venue, organizer, cost, URLs, tags, featured status, and custom meta. Future events are always updated; past events are updated only if the `shelter_sync_include_past` checkbox was checked.
+`Event_Syncer` hooks into `save_post_shelter_program` at priority 20 (after `save_meta` at priority 10). It queries all TEC events with a matching `_shelter_program_post_id`, then updates each event's title, description, times, venue, organizer, cost, URLs, tags, featured status, and custom meta. Future events are always updated; past events are updated only if the `shelter_sync_include_past` checkbox was checked. Events that have been replaced (i.e. have `_shelter_replaced_by` meta) are skipped — they are frozen in their cancelled state and the replacement event is managed independently.
 
 Venue and organizer resolution uses `$wpdb` exact title queries against `wp_posts` (not `get_posts()` which doesn't support title filtering) to find existing entries. If a draft is found, it's promoted to `publish`. New entries are created with `'status' => 'publish'`.
 
@@ -149,6 +195,7 @@ On first activation, `config/events.json` is imported into CPT posts via `Progra
 | `/shelter-events/v1/upcoming?program=bingo` | GET | Public | Upcoming events, optionally filtered by program slug |
 | `/shelter-events/v1/generate` | POST | Admin | Trigger event generation |
 | `/shelter-events/v1/cancel` | POST | Editor | Cancel a specific event instance |
+| `/shelter-events/v1/replace` | POST | Editor | Cancel an event and create a draft replacement |
 
 ### Gutenberg Block
 
@@ -185,6 +232,13 @@ npm run lint:css    # CSS lint
 | `shelter_events_program_imported` | Action | Fires after a program is imported from JSON seed data. Receives `$post_id`, `$slug`, `$program`. |
 
 ### Changelog
+
+#### 2.2.0
+- **Event replacement** — "Replace" action on shelter-generated events (TEC list row action + Generate page). Cancels the original and creates a draft replacement that opens in TEC's block editor for full creative control. Cancelled-and-replaced events are hidden from front-end displays.
+- **Variable pricing** — "Variable pricing" checkbox on programs. Displays "Varies" across all TEC cost surfaces (single event, calendar views, event list block, REST API) via the `tribe_get_cost` filter.
+- **Blackout dates** — Global blackout dates (Events → Generate Events) and per-program blackout dates (program metabox). Dates in either list are skipped during event generation. Pre-existing events on blackout dates are flagged in the admin UI.
+- **REST endpoint** — `POST /shelter-events/v1/replace` to cancel + create replacement programmatically.
+- **Abilities API** — `shelter_replace_event` ability registered for WP 6.9+.
 
 #### 2.1.0
 - **Event sync on program save** — all future events are auto-updated when a program changes. Staff can opt in to updating past events per-save.

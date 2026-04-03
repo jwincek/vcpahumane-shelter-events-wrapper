@@ -55,6 +55,11 @@ final class Event_Generator {
 		$slug        = $program['slug'];
 		$results     = [];
 
+		// Merge global + per-program blackout dates into a single lookup set.
+		$global_blackouts  = \Shelter_Events_Admin::get_global_blackout_dates();
+		$program_blackouts = $program['blackout_dates'] ?? [];
+		$blackout_set      = array_flip( array_merge( $global_blackouts, $program_blackouts ) );
+
 		foreach ( $period as $date ) {
 			$day_name = strtolower( $date->format( 'l' ) );
 
@@ -63,7 +68,13 @@ final class Event_Generator {
 			}
 
 			$event_date = $date->format( 'Y-m-d' );
-			$hash       = self::make_hash( $slug, $event_date );
+
+			// Skip blackout dates.
+			if ( isset( $blackout_set[ $event_date ] ) ) {
+				continue;
+			}
+
+			$hash = self::make_hash( $slug, $event_date );
 
 			if ( self::event_exists( $hash_key, $hash ) ) {
 				continue;

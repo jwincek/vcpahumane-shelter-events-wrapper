@@ -62,7 +62,34 @@
 	color: #996800;
 }
 
+.shelter-status--blackout {
+	background: #f0e6f6;
+	color: #6b3fa0;
+}
+
 /* Upcoming events table */
 .shelter-upcoming-events .shelter-event-actions a {
 	margin-right: 8px;
+}
+
+/* Blackout dates layout — textarea + summary side by side */
+.shelter-blackout-layout {
+	display: flex;
+	gap: 2rem;
+	align-items: flex-start;
+}
+.shelter-blackout-layout__input {
+	flex: 1;
+	max-width: 300px;
+}
+.shelter-blackout-layout__summary {
+	flex: 1;
+}
+.shelter-blackout-list {
+	margin: 0.5rem 0 0;
+	padding-left: 1.25rem;
+}
+.shelter-blackout-list li {
+	margin-bottom: 0.25rem;
+	font-size: 13px;
 }

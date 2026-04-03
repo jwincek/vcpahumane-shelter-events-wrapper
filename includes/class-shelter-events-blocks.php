@@ -134,9 +134,14 @@ class Shelter_Events_Blocks {
 								</span>
 							<?php endif; ?>
 
-							<?php if ( ! empty( $attributes['showCost'] ) ) : ?>
+							<?php if ( ! empty( $attributes['showCost'] ) ) :
+								$variable = get_post_meta( $event_id, '_shelter_variable_pricing', true );
+								$cost_display = ( $variable === 'yes' )
+									? __( 'Varies', 'shelter-events' )
+									: tribe_get_cost( $event_id, true );
+							?>
 								<span class="shelter-event-item__cost">
-									<?php echo esc_html( tribe_get_cost( $event_id, true ) ); ?>
+									<?php echo esc_html( $cost_display ); ?>
 								</span>
 							<?php endif; ?>
 						</div>
